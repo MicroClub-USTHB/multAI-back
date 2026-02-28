@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: multi_postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - multi_network
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: multi_nats
+    command: >
+      -js
+      -m ${NATS_MONITOR_PORT}
+    ports:
+      - "${NATS_PORT}:4222"
+      - "${NATS_MONITOR_PORT}:8222"
+    networks:
+      - multi_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: multi_minio
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: server /data --console-address ":${MINIO_CONSOLE_PORT}"
+    ports:
+      - "${MINIO_API_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - multi_network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: multi_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@multi.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "${PGADMIN_PORT}:80"
+    networks:
+      - multi_network
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  multi_network:
+    driver: bridge
