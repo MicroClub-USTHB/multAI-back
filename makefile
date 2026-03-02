@@ -1,3 +1,6 @@
+include .env
+export
+
 .PHONY: migration-create migration-up migration-down
 
 migration-create:
@@ -13,8 +16,23 @@ migration-create:
 	echo "  migrations/sql/up/$$msg.sql"; \
 	echo "  migrations/sql/down/$$msg.sql"
 
-migration-up:
+m-up:
 	uv run alembic upgrade head
+	docker exec -t multi_postgres pg_dump \
+	-U $(POSTGRES_USER) \
+	-d $(POSTGRES_DB) \
+	-s \
+	--no-owner --no-privileges --no-comments | \
+	grep -vE '^\\(restrict|unrestrict)' > db/schema.sql
 
-migration-down:
+m-down:
 	uv run alembic downgrade -1
+	docker exec -t multi_postgres pg_dump \
+	-U $(POSTGRES_USER) \
+	-d $(POSTGRES_DB) \
+	-s \
+	--no-owner --no-privileges --no-comments | \
+	grep -vE '^\\(restrict|unrestrict)' > db/schema.sql
+
+gen:
+	sqlc generate --file db/sqlc.yaml
