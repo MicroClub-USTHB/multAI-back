@@ -11,10 +11,10 @@ sql:
     schema: "schema.sql"        
     queries: "queries"         
     codegen:
-      - out: "../app/db"              
+      - out: "generated"              
         plugin: py
         options:
-          package: db             
+          package: "generated" 
           emit_sync_querier: false
           emit_async_querier: true 
           emit_models: true        
