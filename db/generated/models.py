@@ -3,13 +3,29 @@
 #   sqlc v1.30.0
 import dataclasses
 import datetime
-from typing import Optional
+import enum
+from typing import Any, Optional
 import uuid
+
+
+class StaffRole(str, enum.Enum):
+    ADMIN = "admin"
+    MULTI = "multi"
 
 
 @dataclasses.dataclass()
 class AlembicVersion:
     version_num: str
+
+
+@dataclasses.dataclass()
+class StaffUser:
+    id: uuid.UUID
+    discord_id: str
+    email: Optional[str]
+    role: Any
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
 
 @dataclasses.dataclass()
@@ -31,3 +47,13 @@ class UserDevice:
     is_2fa_enabled: bool
     last_active: datetime.datetime
     created_at: datetime.datetime
+
+
+@dataclasses.dataclass()
+class UserSession:
+    id: uuid.UUID
+    user_id: uuid.UUID
+    device_id: uuid.UUID
+    created_at: datetime.datetime
+    last_active: datetime.datetime
+    expires_at: datetime.datetime

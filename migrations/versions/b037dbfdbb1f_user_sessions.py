@@ -7,6 +7,8 @@ Create Date: 2026-03-02 12:32:01.365622
 """
 from typing import Sequence, Union
 
+from migrations.helper import run_sql_down, run_sql_up
+
 
 
 # revision identifiers, used by Alembic.
@@ -17,10 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
-    pass
+    run_sql_up("user_sessions")
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
-    pass
+    run_sql_down("user_sessions")
