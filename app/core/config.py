@@ -5,20 +5,22 @@ class Settings(BaseSettings):
     environment: str = "dev"
     debug: bool = True
 
-    # Database
-    database_url: str
-
     # Redis
-    redis_url: str
+    REDIS_PORT: int
+    REDIS_HOST: str
+    REDIS_PASSWORD: str = ""
+
+    #nats
+    NATS_PORT: int
+    NATS_HOST: str
+    NATS_PASSWORD: str 
+    NATS_USER: str
 
     # MinIO
-    minio_endpoint: str
-    minio_access_key: str
-    minio_secret_key: str
-    minio_bucket: str
-
-    # NATS
-    nats_url: str
+    MINIO_API_PORT: int
+    MINIO_ROOT_USER: str
+    MINIO_ROOT_PASSWORD: str
+    MINIO_HOST:str
 
     # Security
     jwt_secret: str

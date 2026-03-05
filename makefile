@@ -39,3 +39,6 @@ gen:
 
 get_db:
 	psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -h localhost -p $(POSTGRES_PORT)
+
+run-app:
+	uv  run fastapi dev app/main.py 
