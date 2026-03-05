@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.config import settings
-from app.infra.database import get_db
 from app.infra.minio import init_minio_client
 from app.infra.nats import NatsClient
 from app.infra.redis import RedisClient
@@ -11,6 +10,7 @@ from app.router.mobile.auth import router as mobile_auth_router
 
 
 app = FastAPI()
+
 
 
 @app.get("/")
@@ -41,5 +41,5 @@ async def lifespan(app: FastAPI):
     )
     await NatsClient.connect()
     yield
-    await RedisClient.close()
+    await RedisClient.close(RedisClient._instance.client)#todo:fix for self 
     await NatsClient.close()

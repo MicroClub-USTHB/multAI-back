@@ -6,14 +6,14 @@ class RedisClient:
     client: Redis
     _instance = None
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs): # type: ignore
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self, host: str, port: int, password: str):
         if not hasattr(self, "client"):
-            self.client = Redis.from_url(
+            self.client = Redis.from_url( # type: ignore
                 f"redis://{host}:{port}", password=password, decode_responses=True
             )
 
@@ -31,6 +31,6 @@ class RedisClient:
 
     async def expire(self, key: RedisKey | str, seconds: int):
         await self.client.expire(key, seconds)
-
+    
     async def close(self):
         await self.client.close()

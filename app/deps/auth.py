@@ -2,13 +2,12 @@ from typing import Any
 import uuid
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-import sqlalchemy.ext.asyncio
 
 from app.core import constant
 from app.core.exceptions import AppException
 from app.core.securite import decode_access_mobile_token
 from app.infra.redis import RedisClient
-from app.service.auth import AuthService
+from app.service.users import AuthService
 from db.generated import user as user_queries
 from db.generated import session as session_queries
 
@@ -18,8 +17,6 @@ security = HTTPBearer()
 
 async def get_current_mobile_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    redis: RedisClient = Depends(),
-    conn: sqlalchemy.ext.asyncio.AsyncConnection = Depends(),
 ) -> dict[str, Any]:
     token = credentials.credentials
     payload = decode_access_mobile_token(token)

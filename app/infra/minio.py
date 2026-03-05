@@ -75,7 +75,7 @@ class Bucket:
         content_type = (
             res.content_type if res.content_type else "application/octet-stream"
         )
-        filename = res.headers.get("x-amz-meta-filename", f"{object_name}")
+        filename = res.headers.get("x-amz-meta-filename", f"{object_name}") # type: ignore
 
         res.close()
         return (data, filename, content_type)

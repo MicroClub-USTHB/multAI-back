@@ -10,7 +10,7 @@ from app.schema.auth.mobile.auth import (
     RefreshTokenRequest,
     LogoutRequest,
 )
-from app.service.auth import AuthService
+from app.service.users import AuthService
 
 
 router = APIRouter(prefix="/auth", tags=["mobile-auth"])
