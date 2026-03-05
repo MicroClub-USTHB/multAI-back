@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     app_name: str = "multAI"
     environment: str = "dev"
@@ -10,17 +11,24 @@ class Settings(BaseSettings):
     REDIS_HOST: str
     REDIS_PASSWORD: str = ""
 
-    #nats
+    # nats
     NATS_PORT: int
     NATS_HOST: str
-    NATS_PASSWORD: str 
+    NATS_PASSWORD: str
     NATS_USER: str
 
     # MinIO
     MINIO_API_PORT: int
     MINIO_ROOT_USER: str
     MINIO_ROOT_PASSWORD: str
-    MINIO_HOST:str
+    MINIO_HOST: str
+
+    # PostgreSQL
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
 
     # Security
     jwt_secret: str
@@ -33,4 +41,4 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 
-settings = Settings() # type: ignore
+settings = Settings()  # type: ignore

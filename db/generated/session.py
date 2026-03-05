@@ -12,6 +12,11 @@ import sqlalchemy.ext.asyncio
 from generated import models
 
 
+COUNT_USER_SESSIONS = """-- name: count_user_sessions \\:one
+SELECT COUNT(*) FROM user_sessions WHERE user_id = :p1
+"""
+
+
 DELETE_ALL_USER_SESSIONS = """-- name: delete_all_user_sessions \\:exec
 DELETE FROM user_sessions
 WHERE user_id = :p1
@@ -71,6 +76,12 @@ RETURNING id, user_id, device_id, created_at, last_active, expires_at
 class AsyncQuerier:
     def __init__(self, conn: sqlalchemy.ext.asyncio.AsyncConnection):
         self._conn = conn
+
+    async def count_user_sessions(self, *, user_id: uuid.UUID) -> Optional[int]:
+        row = (await self._conn.execute(sqlalchemy.text(COUNT_USER_SESSIONS), {"p1": user_id})).first()
+        if row is None:
+            return None
+        return row[0]
 
     async def delete_all_user_sessions(self, *, user_id: uuid.UUID) -> None:
         await self._conn.execute(sqlalchemy.text(DELETE_ALL_USER_SESSIONS), {"p1": user_id})

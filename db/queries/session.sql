@@ -41,3 +41,6 @@ WHERE user_id = $1;
 -- name: DeleteExpiredSessions :exec
 DELETE FROM user_sessions
 WHERE expires_at < NOW();
+
+-- name: CountUserSessions :one
+SELECT COUNT(*) FROM user_sessions WHERE user_id = $1;
