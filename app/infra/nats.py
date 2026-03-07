@@ -76,7 +76,7 @@ class NatsClient:
             await msg.ack()
         if NatsClient._js is None :
             print("no client ")
-        await NatsClient._js.subscribe(
+        await NatsClient._js.subscribe( # type: ignore
             subject=subject.value,
             stream=stream_name,
             durable=durable_name,

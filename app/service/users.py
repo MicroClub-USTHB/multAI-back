@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any
 import uuid
 import sqlalchemy.ext.asyncio
 
@@ -46,7 +45,7 @@ class AuthService:
         redis: RedisClient,
         req: MobileAuthRequest,
     ) -> MobileAuthResponse:
-        existing_user = await self.user_querier.get_user_by_email(email=req.email)
+        existing_user = await AuthService.user_querier.get_user_by_email(email=req.email)
 
         if existing_user:
             if not verify_password(req.password, existing_user.hashed_password or ""):
@@ -54,26 +53,28 @@ class AuthService:
             user = existing_user
         else:
             hashed = hash_password(req.password)
-            user = await user_querier.create_user(
+            user = await AuthService.user_querier.create_user(
                 email=req.email, hashed_password=hashed
             )
             if not user:
                 raise AppException.internal_error("Failed to create user")
 
-        user_id = user.id
+        user_id: uuid.UUID = user.id
+
+        
 
         session_key = constant.RedisKey.UserSessionByUser.value.format(user_id=user_id)
         if await redis.exists(session_key):
             raise AppException.forbidden("User already has an active session")
 
-        session_count = await self.session_querier.count_user_sessions(user_id=user_id)
+        session_count = await AuthService.session_querier.count_user_sessions(user_id=user_id)
         if session_count and session_count >= AuthService.SESSION_LIMIT:
             raise AppException.forbidden("Maximum session limit reached")
 
         device_id = uuid.UUID(req.device_id)
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
 
-        device = await self.device_querier.create_device(
+        device = await AuthService.device_querier.create_device(
             user_id=user_id,
             device_name=req.device_name,
             device_type=req.device_type,
@@ -83,7 +84,7 @@ class AuthService:
         if not device:
             raise AppException.internal_error("Failed to create device")
 
-        session = await self.session_querier.upsert_session(
+        session = await AuthService.session_querier.upsert_session(
             user_id=user_id,
             device_id=device_id,
             expires_at=expires_at,
@@ -103,7 +104,7 @@ class AuthService:
         return MobileAuthResponse(
             access_token=access_token,
             refresh_token=refresh_token,
-            session_id=str(session.id),
+            session_id=str(),
             expires_in=expiry,
         )
 

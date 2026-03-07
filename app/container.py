@@ -9,4 +9,3 @@ async def init_repo(conn: sqlalchemy.ext.asyncio.AsyncConnection = Depends(get_d
     device_querier :device_queries.AsyncQuerier = device_queries.AsyncQuerier(conn)
     return user_querier,session_querier,device_querier
 
-    

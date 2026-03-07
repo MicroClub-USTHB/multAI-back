@@ -14,9 +14,9 @@ from db.generated import session as session_queries
 
 security = HTTPBearer()
 
-
 async def get_current_mobile_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    conn : Depends()
 ) -> dict[str, Any]:
     token = credentials.credentials
     payload = decode_access_mobile_token(token)
