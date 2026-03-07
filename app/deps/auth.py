@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core import constant
 from app.core.exceptions import AppException
 from app.core.securite import decode_access_mobile_token
+from app.infra.database import get_db
 from app.infra.redis import RedisClient
 from app.service.users import AuthService
 from db.generated import user as user_queries
@@ -16,7 +17,7 @@ security = HTTPBearer()
 
 async def get_current_mobile_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    conn : Depends()
+    conn : Depends(get_db)
 ) -> dict[str, Any]:
     token = credentials.credentials
     payload = decode_access_mobile_token(token)
