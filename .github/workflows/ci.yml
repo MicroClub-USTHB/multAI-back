@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --all-extras --dev
       - name: Lint
-        run: uv run flake8
+        run: uv run ruff check .
 
       - name: Type Check
         run: uv run mypy .
