@@ -1,15 +1,30 @@
+from insightface import FaceAnalysis
+from typing import List, Tuple
 
 
 class FaceDetection:
-    def __init__(self):
-        pass
+    def __init__(self, model_name = str):
+        self.model = model_name
+        self.app = None
     
     def load_model(self):
-        pass
+        self.app = FaceAnalysis(name=self.model, allowed_modules=['detection'])
+        print("[FaceDetection] model loaded successfully!")
+    
     
     def init_model(self):
-        pass
+        if self.app is None:
+            raise ValueError("model not loaded. call load_model() first.")
+        self.app.prepare(ctx_id=0, det_size=(640, 640))  # ctx_id=0 → GPU, -1 for CPU
+        print("[INFO] Model initialized and ready.")
     
     def detect(self, image)->list[tuple[int,int,int,int]]:
-        pass
-
+        if self.app is None:
+            raise ValueError("model not loaded. call load_model() and init_model() first.")
+       
+        faces = self.app.get(image)
+        bboxes: List[Tuple[int, int, int, int]] = []
+        for face in faces:
+            x1, y1, x2, y2 = face.bbox.astype(int)
+            bboxes.append((x1, y1, x2, y2))
+        return bboxes
