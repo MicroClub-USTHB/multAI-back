@@ -11,7 +11,7 @@ class BlurFilter(BaseFilter):
     Blur cannot be fully fixed, but we attempt a sharpening pass once.
     """
 
-    BLUR_THRESHOLD = 80.0  # below this = too blurry
+    BLUR_THRESHOLD = 15.0
 
     def _measure_blur(self, image: np.ndarray) -> float:
         """Returns the Laplacian variance score. Higher = sharper."""

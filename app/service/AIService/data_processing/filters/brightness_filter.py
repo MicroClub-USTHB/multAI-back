@@ -10,7 +10,7 @@ class BrightnessFilter(BaseFilter):
     Attempts gamma correction as a fix.
     """
 
-    MIN_BRIGHTNESS = 50   # below this = too dark
+    MIN_BRIGHTNESS = 70   # below this = too dark
     MAX_BRIGHTNESS = 220  # above this = too bright
 
     def _measure_brightness(self, image: np.ndarray) -> float:
