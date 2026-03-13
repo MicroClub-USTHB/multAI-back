@@ -1,9 +1,9 @@
-from insightface import FaceAnalysis
+from insightface.app import FaceAnalysis
 from typing import List, Tuple
 
 
 class FaceDetection:
-    def __init__(self, model_name = str):
+    def __init__(self, model_name: str = "buffalo_l"):
         self.model = model_name
         self.app = None
     
