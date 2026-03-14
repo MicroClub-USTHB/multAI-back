@@ -11,8 +11,8 @@ from app.core.exceptions import AppException
 
 IMAGES_BUCKET_NAME = "images"
 DOCUMENTS_BUCKET_NAME = "documents"
-WA_SIM_BUCKET_NAME = "wa-sim"
-
+IMAGE_REQUEST_BUCKET_NAME = "image-request"
+HOT_BUCKET_NAME = "hot"
 async def init_minio_client(
     minio_host: str, minio_port: int, minio_root_user: str, minio_root_password: str
 ) -> None:
@@ -23,7 +23,7 @@ async def init_minio_client(
         secure=False,
     )
 
-    for bucket_name in [IMAGES_BUCKET_NAME, DOCUMENTS_BUCKET_NAME, WA_SIM_BUCKET_NAME]:
+    for bucket_name in [IMAGES_BUCKET_NAME, DOCUMENTS_BUCKET_NAME, IMAGE_REQUEST_BUCKET_NAME, HOT_BUCKET_NAME]:
         if not await Bucket.client.bucket_exists(bucket_name):
             await Bucket.client.make_bucket(bucket_name)
 
