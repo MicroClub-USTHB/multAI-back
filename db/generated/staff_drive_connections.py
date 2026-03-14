@@ -32,6 +32,28 @@ WHERE staff_user_id = :p1
 """
 
 
+UPDATE_STAFF_DRIVE_CONNECTION_TOKENS = """-- name: update_staff_drive_connection_tokens \\:one
+UPDATE staff_drive_connections
+SET access_token = :p3,
+    refresh_token = :p4,
+    token_expires_at = :p5,
+    updated_at = NOW()
+WHERE staff_user_id = :p1
+  AND provider = :p2
+  AND revoked_at IS NULL
+RETURNING id, staff_user_id, provider, google_email, google_account_id, access_token, refresh_token, token_expires_at, scopes, connected_at, revoked_at, created_at, updated_at
+"""
+
+
+@dataclasses.dataclass()
+class UpdateStaffDriveConnectionTokensParams:
+    staff_user_id: uuid.UUID
+    provider: str
+    access_token: str
+    refresh_token: Optional[str]
+    token_expires_at: Optional[datetime.datetime]
+
+
 UPSERT_STAFF_DRIVE_CONNECTION = """-- name: upsert_staff_drive_connection \\:one
 INSERT INTO staff_drive_connections (
     staff_user_id,
@@ -101,6 +123,32 @@ class AsyncQuerier:
 
     async def revoke_staff_drive_connection_by_staff_user_id(self, *, staff_user_id: uuid.UUID, provider: str) -> None:
         await self._conn.execute(sqlalchemy.text(REVOKE_STAFF_DRIVE_CONNECTION_BY_STAFF_USER_ID), {"p1": staff_user_id, "p2": provider})
+
+    async def update_staff_drive_connection_tokens(self, arg: UpdateStaffDriveConnectionTokensParams) -> Optional[models.StaffDriveConnection]:
+        row = (await self._conn.execute(sqlalchemy.text(UPDATE_STAFF_DRIVE_CONNECTION_TOKENS), {
+            "p1": arg.staff_user_id,
+            "p2": arg.provider,
+            "p3": arg.access_token,
+            "p4": arg.refresh_token,
+            "p5": arg.token_expires_at,
+        })).first()
+        if row is None:
+            return None
+        return models.StaffDriveConnection(
+            id=row[0],
+            staff_user_id=row[1],
+            provider=row[2],
+            google_email=row[3],
+            google_account_id=row[4],
+            access_token=row[5],
+            refresh_token=row[6],
+            token_expires_at=row[7],
+            scopes=row[8],
+            connected_at=row[9],
+            revoked_at=row[10],
+            created_at=row[11],
+            updated_at=row[12],
+        )
 
     async def upsert_staff_drive_connection(self, arg: UpsertStaffDriveConnectionParams) -> Optional[models.StaffDriveConnection]:
         row = (await self._conn.execute(sqlalchemy.text(UPSERT_STAFF_DRIVE_CONNECTION), {
