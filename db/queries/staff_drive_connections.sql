@@ -41,3 +41,14 @@ SET revoked_at = NOW(),
 WHERE staff_user_id = $1
   AND provider = $2
   AND revoked_at IS NULL;
+
+-- name: UpdateStaffDriveConnectionTokens :one
+UPDATE staff_drive_connections
+SET access_token = $3,
+    refresh_token = $4,
+    token_expires_at = $5,
+    updated_at = NOW()
+WHERE staff_user_id = $1
+  AND provider = $2
+  AND revoked_at IS NULL
+RETURNING id, staff_user_id, provider, google_email, google_account_id, access_token, refresh_token, token_expires_at, scopes, connected_at, revoked_at, created_at, updated_at;
