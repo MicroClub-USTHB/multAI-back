@@ -51,5 +51,3 @@ class FaceEmbedding:
             raise ValueError("Failed to generate embedding for first face")
 
         return best_face.embedding.flatten().tolist()
-
-    

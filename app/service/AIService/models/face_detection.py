@@ -28,3 +28,4 @@ class FaceDetection:
             x1, y1, x2, y2 = face.bbox.astype(int)
             bboxes.append((x1, y1, x2, y2))
         return bboxes
+    
