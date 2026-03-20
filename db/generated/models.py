@@ -203,6 +203,7 @@ class User:
     updated_at: datetime.datetime
     display_name: Optional[str]
     face_embedding: Optional[Any]
+    blocked: bool
     deleted_at: Optional[datetime.datetime]
 
 
