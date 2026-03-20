@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from typing import List, Literal, Optional, Sequence, Tuple, TypedDict
 
 import cv2
 import numpy as np
-from insightface.app import FaceAnalysis # type: ignore
+from insightface.app import FaceAnalysis  # type: ignore
+
 from app.core.exceptions import AppException
 
-
-BBox = tuple[int, int, int, int]
+BBox = Tuple[int, int, int, int]
 
 
 class FaceImagePayload(TypedDict):
@@ -18,6 +19,7 @@ class FaceImagePayload(TypedDict):
     bytes: bytes
 
 
+@dataclass                                   # ① proper dataclass
 class FaceStub:
     bbox: Tuple[float, float, float, float]
     det_score: float
@@ -42,68 +44,70 @@ class FaceEmbedding:
         self.det_size = det_size
         self._initialized = False
 
+    # ② single centralized readiness guard
+    def _ensure_ready(self) -> None:
+        if self.model is None or not self._initialized:
+            raise RuntimeError("Model not ready. Call `prepare()` first.")
+
     def load_model(self) -> None:
         if self.model is not None:
             return
-
         self.model = FaceAnalysis(
-            name=self.model_name,
-            providers=list(self.providers),
-        )
-        print("[FaceEmbedding] model loaded!")
+            name=self.model_name, providers=list(self.providers))
 
     def init_model(self) -> None:
         if self.model is None:
-            raise ValueError("Model not loaded")
-
+            raise ValueError("Model not loaded. Call `load_model()` first.")
         if self._initialized:
             return
-
-        self.model.prepare(ctx_id=self.ctx_id, det_size=self.det_size)  # type: ignore
+        self.model.prepare(ctx_id=self.ctx_id,
+                           det_size=self.det_size)  # type: ignore
         self._initialized = True
-        print("[FaceEmbedding] model initialized")
 
     def prepare(self) -> None:
         self.load_model()
         self.init_model()
 
-    def embed(self, image: np.ndarray, bboxes: Sequence[BBox]) -> list[float]:
-        if not bboxes:
-            raise ValueError("No faces to embed")
+    # ③ explicit detect() method — fixes the abstraction leak in the service layer
+    def detect(self, image_bgr: np.ndarray) -> list[FaceStub]:
+        """Run detection + embedding on a BGR image (OpenCV native format)."""
+        self._ensure_ready()
+        return self.model.get(image_bgr)  # type: ignore
 
-        if self.model is None or not self._initialized:
-            raise RuntimeError("Model not ready. Call `prepare()` first.")
-
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        faces: list[FaceStub] = self.model.get(image_rgb)  # type: ignore
+    def embed(self, image_bgr: np.ndarray, bbox_hint: BBox | None = None) -> list[float]:
+        """
+        Extract embedding of the face closest to bbox_hint (centroid match).
+        Falls back to highest-confidence face when bbox_hint is None.
+        """
+        self._ensure_ready()
+        faces: list[FaceStub] = self.model.get(image_bgr)  # type: ignore
 
         if not faces:
-            raise ValueError("No faces detected by the model")
+            raise ValueError("No faces detected in image")
 
-        x1, y1, x2, y2 = bboxes[0]
-        target_cx = (x1 + x2) / 2
-        target_cy = (y1 + y2) / 2
+        face = (
+            self._pick_by_bbox(faces, bbox_hint)
+            if bbox_hint is not None
+            else max(faces, key=lambda f: f.det_score)  # ④ best score fallback
+        )
 
-        best_face: Optional[FaceStub] = None
-        best_dist = float("inf")
+        if face.embedding is None:
+            raise ValueError("No embedding produced for the selected face")
 
-        for face in faces:
-            fx1, fy1, fx2, fy2 = face.bbox
-            cx = (fx1 + fx2) / 2
-            cy = (fy1 + fy2) / 2
+        return face.embedding.flatten().tolist()
 
-            dist = np.sqrt((cx - target_cx) ** 2 + (cy - target_cy) ** 2)
-
-            if dist < best_dist:
-                best_dist = dist
-                best_face = face
-
-        if best_face is None or best_face.embedding is None:
-            raise ValueError("Failed to generate embedding for selected face")
-
-        embedding = best_face.embedding.flatten()
-        return embedding.tolist()
+    @staticmethod
+    def _pick_by_bbox(faces: list[FaceStub], bbox: BBox) -> FaceStub:
+        """⑤ Concise centroid matching with np.hypot instead of manual sqrt."""
+        tx = (bbox[0] + bbox[2]) / 2
+        ty = (bbox[1] + bbox[3]) / 2
+        return min(
+            faces,
+            key=lambda f: np.hypot(
+                (f.bbox[0] + f.bbox[2]) / 2 - tx,
+                (f.bbox[1] + f.bbox[3]) / 2 - ty,
+            ),
+        )
 
 
 class FaceEmbeddingService:
@@ -115,50 +119,47 @@ class FaceEmbeddingService:
         self,
         payloads: Sequence[FaceImagePayload],
     ) -> list[float]:
-
         if not payloads:
             raise AppException.bad_request(
                 "At least one image is required for enrollment"
             )
 
-        embeddings: list[np.ndarray] = []
+        # ⑥ parallel processing — all images are embedded concurrently
+        embeddings: list[np.ndarray] = await asyncio.gather(
+            *[self._embed_payload(p) for p in payloads]
+        )
 
-        for payload in payloads:
-            image = self._decode_image(payload)
-            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-            # Single detection pass — model.get() already returns embeddings
-            faces: list[FaceStub] = await asyncio.to_thread( # type: ignore
-                self.face_embedding.model.get, image_rgb  # type: ignore
-            )
-
-            if not faces:
-                raise AppException.bad_request(
-                    f"No faces detected in image {payload['filename']}"
-                )
-
-            face = faces[0]
-
-            if face.embedding is None:
-                raise AppException.bad_request(
-                    f"Failed to generate embedding for {payload['filename']}"
-                )
-
-            embeddings.append(face.embedding.astype(np.float32))
-
-        stacked = np.stack(embeddings, axis=0)
-        averaged = np.mean(stacked, axis=0)
-
+        averaged = np.mean(np.stack(embeddings, axis=0), axis=0)
         return averaged.astype(float).tolist()
 
-    def _decode_image(self, payload: FaceImagePayload) -> np.ndarray:
+    async def _embed_payload(self, payload: FaceImagePayload) -> np.ndarray:
+        """⑦ Extracted per-image logic into its own async method."""
+        image = self._decode_image(payload)
 
-        buffer = np.frombuffer(payload["bytes"], dtype=np.uint8)
-        image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+        faces: list[FaceStub] = await asyncio.to_thread(
+            self.face_embedding.detect, image   # ③ uses detect(), not model.get()
+        )
 
-        if image is None:
+        if not faces:
             raise AppException.bad_request(
-                f"Cannot decode uploaded image {payload['filename']}"
+                f"No faces detected in image '{payload['filename']}'"
             )
 
+        face = max(faces, key=lambda f: f.det_score)
+
+        if face.embedding is None:
+            raise AppException.bad_request(
+                f"Failed to generate embedding for '{payload['filename']}'"
+            )
+
+        return face.embedding.astype(np.float32)
+
+    @staticmethod
+    def _decode_image(payload: FaceImagePayload) -> np.ndarray:
+        buffer = np.frombuffer(payload["bytes"], dtype=np.uint8)
+        image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+        if image is None:
+            raise AppException.bad_request(
+                f"Cannot decode uploaded image '{payload['filename']}'"
+            )
         return image
