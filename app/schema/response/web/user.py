@@ -2,7 +2,10 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel
+<<<<<<< HEAD
 from db.generated.models import User
+=======
+>>>>>>> 8ce7e61 (Add admin user CRUD and block/unblock endpoints)
 
 
 class AdminUserSchema(BaseModel):
@@ -12,6 +15,7 @@ class AdminUserSchema(BaseModel):
     blocked: bool
     created_at: datetime
     updated_at: datetime
+<<<<<<< HEAD
 
 
 def to_admin_user_schema(user: User) -> AdminUserSchema:
@@ -23,3 +27,5 @@ def to_admin_user_schema(user: User) -> AdminUserSchema:
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
+=======
+>>>>>>> 8ce7e61 (Add admin user CRUD and block/unblock endpoints)
