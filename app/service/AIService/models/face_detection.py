@@ -9,10 +9,7 @@ class FaceDetection:
         self.model = model_name
         self.app: Optional[FaceAnalysis] = None
 
-    def prepare(self) -> None:
-        self.app = FaceAnalysis(name=self.model, allowed_modules=['detection'])
-        self.app.prepare(ctx_id=-1, det_size=(640, 640))  # type: ignore
-        print("[FaceDetection] model loaded and ready!")
+    
 
     def detect(self, image: np.ndarray) -> list[BBox]:
         if self.app is None:
