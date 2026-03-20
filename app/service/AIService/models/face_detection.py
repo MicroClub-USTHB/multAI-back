@@ -13,6 +13,12 @@ class FaceDetection:
         self.app = FaceAnalysis(name=self.model, allowed_modules=['detection'])
         print("[FaceDetection] model loaded successfully!")
 
+    def init_model(self) -> None:
+        if self.app is None:
+            raise ValueError("Model not loaded. Call load_model() first.")
+        self.app.prepare(ctx_id=-1, det_size=(640, 640))  # type: ignore
+        print("[FaceDetection] model initialized and ready.")
+
     def detect(self, image: np.ndarray) -> list[BBox]:
         if self.app is None:
             raise ValueError("Model not ready. Call load_model() first.")
