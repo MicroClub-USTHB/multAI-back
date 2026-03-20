@@ -4,6 +4,7 @@ from enum import Enum
 class RedisKey(str, Enum):
     UserSession = "user_session"
     UserSessionByUser = "user_session:{user_id}"
+<<<<<<< HEAD
     INVALID_TOKEN_SET_KEY=  "notifications:invalid_tokens"
 
 
@@ -23,6 +24,8 @@ class AuditEventType(str, Enum):
     UPLOAD_REQUEST_REJECTED = "upload_request.rejected"
 
 
+=======
+>>>>>>> 138b7c6 (Add token blacklist and blocked checks in auth)
     BlacklistedSession = "blacklist:session:{session_id}"
 
 IMAGE_ALLOWED_TYPES = {
