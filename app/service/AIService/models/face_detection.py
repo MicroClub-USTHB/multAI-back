@@ -1,5 +1,5 @@
 from insightface.app import FaceAnalysis  # type: ignore
-from typing import List, Tuple, Optional
+from typing import Optional
 import numpy as np
 
 BBox = tuple[int, int, int, int]
