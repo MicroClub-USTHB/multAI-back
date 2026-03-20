@@ -1,6 +1,7 @@
 from insightface.app import FaceAnalysis
 from typing import List, Tuple
 
+BBox = Tuple[int, int, int, int]
 
 class FaceDetection:
     def __init__(self, model_name: str = "buffalo_l"):
@@ -13,14 +14,10 @@ class FaceDetection:
         print("[FaceDetection] model loaded and ready!")
 
     
-    def detect(self, image)->list[tuple[int,int,int,int]]:
+    def detect(self, image)->List[BBox]:
         if self.app is None:
             raise ValueError("model not loaded. call load_model() and init_model() first.")
        
         faces = self.app.get(image)
-        bboxes: List[Tuple[int, int, int, int]] = []
-        for face in faces:
-            x1, y1, x2, y2 = face.bbox.astype(int)
-            bboxes.append((x1, y1, x2, y2))
-        return bboxes
+        return [(int(x1), int(y1), int(x2), int(y2)) for x1, y1, x2, y2 in [f.bbox for f in faces]]
     
