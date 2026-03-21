@@ -250,12 +250,10 @@ class BatchFaceEmbeddingService:
         }
         embedding_literal = self._vector_literal(face.embedding)
         return await self.photo_face_querier.upsert_photo_face(
-            arg=photo_face_queries.UpsertPhotoFaceParams(
-                photo_id=photo_id,
-                face_index=face_index,
-                embedding=embedding_literal,
-                bbox=json.dumps(bbox_payload),
-            )
+            photo_id=photo_id,
+            face_index=face_index,
+            dollar_3=embedding_literal,
+            bbox=json.dumps(bbox_payload),
         )
 
     @staticmethod
