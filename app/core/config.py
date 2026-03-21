@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     NATS_HOST: str
     NATS_PASSWORD: str
     NATS_USER: str
+    NATS_FACE_EMBEDDING_STREAM: str = "face_embeddings"
+    NATS_FACE_EMBEDDING_DURABLE: str = "face_embeddings_worker"
 
 
     # MinIO
@@ -55,9 +57,10 @@ class Settings(BaseSettings):
     FACE_ENCRYPTION_KEY: str
     FIREBASE_CREDENTIALS_PATH: str = "multiai-c9380-firebase-adminsdk-fbsvc-cb6e5ce41b.json"
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+    )
 
 
 settings = Settings()  # type: ignore
