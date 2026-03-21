@@ -9,6 +9,7 @@ from miniopy_async.api import Minio
 
 from app.core.utils import check_extension
 from app.core.exceptions import AppException
+from app.core.constant import DEFAULT_CONTENT_TYPE
 
 
 IMAGES_BUCKET_NAME = "images"
@@ -48,7 +49,7 @@ class Bucket:
             object_name = str(uuid.uuid4())
 
         if file.content_type is None:
-            file.content_type = "application/octet-stream"
+            file.content_type = DEFAULT_CONTENT_TYPE
 
         if file.filename is None:
             file.filename = object_name
@@ -80,7 +81,7 @@ class Bucket:
 
         data = await res.read()
         content_type = (
-            res.content_type if res.content_type else "application/octet-stream"
+            res.content_type if res.content_type else DEFAULT_CONTENT_TYPE
         )
         filename = res.headers.get("x-amz-meta-filename", f"{object_name}")
 
