@@ -32,6 +32,10 @@ IMAGE_ALLOWED_TYPES = {
     "image/heif"
 }
 
+DEFAULT_CONTENT_TYPE = "application/octet-stream"
+DRIVE_ALLOWED_HOSTS = {"drive.google.com", "docs.google.com"}
+MINIO_URL_PREFIX = "minio://"
+
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 MIN_ENROLL_IMAGES = 3
 MAX_ENROLL_IMAGES = 5
