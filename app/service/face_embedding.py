@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from typing import List, Literal, Optional, Sequence, Tuple, TypedDict
 
 import cv2 # type: ignore
@@ -25,6 +26,12 @@ class FaceStub:
     gender: Optional[Literal["F", "M"]] = None
     age: Optional[int] = None
     embedding: Optional[np.ndarray] = None
+
+
+@dataclass(frozen=True)
+class DetectedFace:
+    embedding: list[float]
+    bbox: Tuple[float, float, float, float]
 
 
 class FaceEmbedding:
@@ -106,6 +113,12 @@ class FaceEmbedding:
         return embedding.tolist()
 
 
+class DetectedFace:
+    def __init__(self, embedding: list[float], bbox: tuple[float, float, float, float]):
+        self.embedding = embedding
+        self.bbox = bbox
+
+
 class FaceEmbeddingService:
     def __init__(self, face_embedding: FaceEmbedding | None = None) -> None:
         self.face_embedding = face_embedding or FaceEmbedding()
@@ -183,6 +196,26 @@ class FaceEmbeddingService:
                 results[payload["filename"]] = []
 
         return results
+
+    async def detect_faces(
+        self,
+        payload: FaceImagePayload,
+    ) -> list[DetectedFace]:
+        image = self._decode_image(payload)
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        faces: list[FaceStub] = await asyncio.to_thread( # type: ignore
+            self.face_embedding.model.get, image_rgb  # type: ignore
+        )
+
+        detected: list[DetectedFace] = []
+        for face in faces:
+            if face.embedding is None:
+                continue
+            embedding = face.embedding.astype(float).flatten().tolist()
+            detected.append(DetectedFace(embedding=embedding, bbox=face.bbox))
+
+        return detected
 
     def _decode_image(self, payload: FaceImagePayload) -> np.ndarray:
 
