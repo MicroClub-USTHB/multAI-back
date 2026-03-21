@@ -145,9 +145,11 @@ class BatchFaceEmbeddingService:
                     )
                     if stored is None:
                         raise AppException.internal_error("Failed to store face embedding")
+                    await self._commit_best_effort()
                     faces_stored += 1
                     total_faces_stored += 1
                 except IntegrityError as exc:
+                    await self._rollback_best_effort()
                     logger.warning(
                         "Failed to store face %s for photo %s: %s",
                         face_index,
@@ -156,6 +158,7 @@ class BatchFaceEmbeddingService:
                     )
                     errors.append(f"face {face_index}: {exc}")
                 except Exception as exc:
+                    await self._rollback_best_effort()
                     logger.warning(
                         "Failed to store face %s for photo %s: %s",
                         face_index,
@@ -243,10 +246,10 @@ class BatchFaceEmbeddingService:
         face: DetectedFace,
     ) -> models.PhotoFace | None:
         bbox_payload = {
-            "x1": face.bbox[0],
-            "y1": face.bbox[1],
-            "x2": face.bbox[2],
-            "y2": face.bbox[3],
+            "x1": float(face.bbox[0]),
+            "y1": float(face.bbox[1]),
+            "x2": float(face.bbox[2]),
+            "y2": float(face.bbox[3]),
         }
         embedding_literal = self._vector_literal(face.embedding)
         return await self.photo_face_querier.upsert_photo_face(
@@ -255,6 +258,24 @@ class BatchFaceEmbeddingService:
             dollar_3=embedding_literal,
             bbox=json.dumps(bbox_payload),
         )
+
+    async def _rollback_best_effort(self) -> None:
+        conn = getattr(self.photo_face_querier, "_conn", None)
+        if conn is None:
+            return
+        try:
+            await conn.rollback()
+        except Exception:
+            pass
+
+    async def _commit_best_effort(self) -> None:
+        conn = getattr(self.photo_face_querier, "_conn", None)
+        if conn is None:
+            return
+        try:
+            await conn.commit()
+        except Exception:
+            pass
 
     @staticmethod
     def _vector_literal(embedding: Sequence[float]) -> str:
