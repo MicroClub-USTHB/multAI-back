@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.exceptions import AppException
 from app.core.logger import logger
+from app.core.constant import DEFAULT_CONTENT_TYPE, DRIVE_ALLOWED_HOSTS, MINIO_URL_PREFIX
 from app.infra.google_drive import GoogleDriveClient, GoogleDriveFileDownload
 from app.infra.minio import Bucket, IMAGES_BUCKET_NAME
 from app.service.face_embedding import DetectedFace, FaceEmbeddingService, FaceImagePayload
@@ -231,7 +232,7 @@ class BatchFaceEmbeddingService:
         if not path.exists() or not path.is_file():
             raise AppException.not_found(f"Local file not found: {path}")
         data = path.read_bytes()
-        content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        content_type = mimetypes.guess_type(path.name)[0] or DEFAULT_CONTENT_TYPE
         return FaceImagePayload(
             filename=path.name,
             content_type=content_type,
@@ -294,7 +295,7 @@ class BatchFaceEmbeddingService:
     def _extract_drive_file_id(source: str) -> str:
         if source.startswith("http://") or source.startswith("https://"):
             parsed = urlparse(source)
-            if "drive.google.com" not in parsed.netloc and "docs.google.com" not in parsed.netloc:
+            if not any(host in parsed.netloc for host in DRIVE_ALLOWED_HOSTS):
                 raise AppException.bad_request("Invalid Google Drive URL")
             query_id = parse_qs(parsed.query).get("id")
             if query_id and query_id[0]:
@@ -309,8 +310,8 @@ class BatchFaceEmbeddingService:
 
     @staticmethod
     def _parse_minio_source(source: str) -> tuple[str, str]:
-        if source.startswith("minio://"):
-            raw = source[len("minio://") :]
+        if source.startswith(MINIO_URL_PREFIX):
+            raw = source[len(MINIO_URL_PREFIX) :]
             parts = raw.split("/", 1)
             if len(parts) != 2 or not parts[0] or not parts[1]:
                 raise AppException.bad_request("Invalid MinIO source format")
