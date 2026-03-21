@@ -5,6 +5,7 @@ from app.deps.ai_deps import get_face_embedding_service
 from app.infra.database import get_db
 from app.infra.redis import RedisClient
 from app.service.device import DeviceService
+from app.service.batch_face_embedding import BatchFaceEmbeddingService
 from app.service.face_embedding import FaceEmbeddingService
 from app.service.session import SessionService
 from app.service.staged_upload_storage import StagedUploadStorageService
@@ -17,6 +18,7 @@ from app.service.upload_requests import UploadRequestsService
 from app.service.users import AuthService
 from app.service.user_notification import UserNotificationService
 from db.generated import devices as device_queries
+from db.generated import photo_faces as photo_face_queries
 from db.generated import photos as photo_queries
 from db.generated import session as session_queries
 from db.generated import staff_drive_connections as staff_drive_queries
@@ -54,6 +56,7 @@ class Container:
         self.upload_request_querier = upload_request_queries.AsyncQuerier(conn)
         self.upload_request_photo_querier = upload_request_photo_queries.AsyncQuerier(conn)
         self.photo_querier = photo_queries.AsyncQuerier(conn)
+        self.photo_face_querier = photo_face_queries.AsyncQuerier(conn)
         self.staff_notification_querier = staff_notification_queries.AsyncQuerier(conn)
         self.notification_querier = notification_queries.AsyncQuerier(conn)
         self.audit_querier = audit_queries.AsyncQuerier(conn)
@@ -102,6 +105,7 @@ class Container:
             staff_notifications_service=self.staff_notifications_service,
         )
 
+<<<<<<< HEAD
         notification_queue = NotificationQueue(settings=NotifSetting)
 
         self.user_notifications_service = UserNotificationService(
@@ -112,6 +116,12 @@ class Container:
         self.audit_service = AuditService(
             audit_querier=self.audit_querier,
             user_querier=self.user_querier,
+=======
+        self.batch_face_embedding_service = BatchFaceEmbeddingService(
+            face_embedding_service=self.face_embedding_service,
+            staff_drive_service=self.staff_drive_service,
+            photo_face_querier=self.photo_face_querier,
+>>>>>>> 08a1d9f (feat: wire batch face embedding service in container)
         )
 
         self.staff_user_service = StaffUserService()
