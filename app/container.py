@@ -6,6 +6,7 @@ from app.infra.database import get_db
 from app.infra.redis import RedisClient
 from app.service.device import DeviceService
 from app.service.batch_face_embedding import BatchFaceEmbeddingService
+from app.service.batch_face_embedding_queue import BatchFaceEmbeddingQueueService
 from app.service.face_embedding import FaceEmbeddingService
 from app.service.session import SessionService
 from app.service.staged_upload_storage import StagedUploadStorageService
@@ -123,6 +124,8 @@ class Container:
             photo_face_querier=self.photo_face_querier,
 >>>>>>> 08a1d9f (feat: wire batch face embedding service in container)
         )
+
+        self.batch_face_embedding_queue_service = BatchFaceEmbeddingQueueService()
 
         self.staff_user_service = StaffUserService()
 
