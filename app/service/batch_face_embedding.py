@@ -72,112 +72,19 @@ class BatchFaceEmbeddingService:
         if not items:
             raise AppException.bad_request("At least one image is required")
 
-        access_token: str | None = None
-        if any(item.source_type == "drive" for item in items):
-            if staff_user_id is None:
-                raise AppException.bad_request("staff_user_id is required for drive sources")
-            access_token = await self.staff_drive_service.get_access_token_for_staff_user(
-                staff_user_id
-            )
-
+        access_token = await self._get_access_token(items, staff_user_id)
         results: list[BatchImageResult] = []
         total_faces_detected = 0
         total_faces_stored = 0
 
         for item in items:
-            errors: list[str] = []
-            faces_detected = 0
-            faces_stored = 0
-
-            try:
-                payload = await self._load_payload(item, access_token)
-            except Exception as exc:
-                logger.warning(
-                    "Failed to load image for photo %s (%s): %s",
-                    item.photo_id,
-                    item.source,
-                    exc,
-                )
-                errors.append(str(exc))
-                results.append(
-                    BatchImageResult(
-                        photo_id=item.photo_id,
-                        source_type=item.source_type,
-                        source=item.source,
-                        faces_detected=0,
-                        faces_stored=0,
-                        errors=errors,
-                    )
-                )
-                continue
-
-            try:
-                faces = await self.face_embedding_service.detect_faces(payload)
-                faces_detected = len(faces)
-                total_faces_detected += faces_detected
-            except Exception as exc:
-                logger.warning(
-                    "Face detection failed for photo %s: %s",
-                    item.photo_id,
-                    exc,
-                )
-                errors.append(str(exc))
-                results.append(
-                    BatchImageResult(
-                        photo_id=item.photo_id,
-                        source_type=item.source_type,
-                        source=item.source,
-                        faces_detected=0,
-                        faces_stored=0,
-                        errors=errors,
-                    )
-                )
-                continue
-
-            if not faces:
-                errors.append("No faces detected")
-
-            for face_index, face in enumerate(faces):
-                try:
-                    stored = await self._store_face(
-                        photo_id=item.photo_id,
-                        face_index=face_index,
-                        face=face,
-                    )
-                    if stored is None:
-                        raise AppException.internal_error("Failed to store face embedding")
-                    await self._commit_best_effort()
-                    faces_stored += 1
-                    total_faces_stored += 1
-                except IntegrityError as exc:
-                    await self._rollback_best_effort()
-                    logger.warning(
-                        "Failed to store face %s for photo %s: %s",
-                        face_index,
-                        item.photo_id,
-                        exc,
-                    )
-                    errors.append(f"face {face_index}: {exc}")
-                except Exception as exc:
-                    await self._rollback_best_effort()
-                    logger.warning(
-                        "Failed to store face %s for photo %s: %s",
-                        face_index,
-                        item.photo_id,
-                        exc,
-                    )
-                    errors.append(f"face {face_index}: {exc}")
-
-            results.append(
-                BatchImageResult(
-                    photo_id=item.photo_id,
-                    source_type=item.source_type,
-                    source=item.source,
-                    faces_detected=faces_detected,
-                    faces_stored=faces_stored,
-                    errors=errors,
-                )
+            result, faces_detected, faces_stored = await self._process_item(
+                item,
+                access_token,
             )
+            total_faces_detected += faces_detected
+            total_faces_stored += faces_stored
+            results.append(result)
 
         failures = sum(1 for result in results if result.errors)
         return BatchFaceEmbeddingSummary(
@@ -186,6 +93,113 @@ class BatchFaceEmbeddingService:
             total_faces_stored=total_faces_stored,
             failures=failures,
             results=results,
+        )
+
+    async def _get_access_token(
+        self,
+        items: Sequence[BatchImageInput],
+        staff_user_id: uuid.UUID | None,
+    ) -> str | None:
+        if not any(item.source_type == "drive" for item in items):
+            return None
+        if staff_user_id is None:
+            raise AppException.bad_request("staff_user_id is required for drive sources")
+        return await self.staff_drive_service.get_access_token_for_staff_user(
+            staff_user_id
+        )
+
+    async def _process_item(
+        self,
+        item: BatchImageInput,
+        access_token: str | None,
+    ) -> tuple[BatchImageResult, int, int]:
+        errors: list[str] = []
+        try:
+            payload = await self._load_payload(item, access_token)
+        except Exception as exc:
+            logger.warning(
+                "Failed to load image for photo %s (%s): %s",
+                item.photo_id,
+                item.source,
+                exc,
+            )
+            errors.append(str(exc))
+            return self._build_result(item, 0, 0, errors), 0, 0
+
+        try:
+            faces = await self.face_embedding_service.detect_faces(payload)
+        except Exception as exc:
+            logger.warning(
+                "Face detection failed for photo %s: %s",
+                item.photo_id,
+                exc,
+            )
+            errors.append(str(exc))
+            return self._build_result(item, 0, 0, errors), 0, 0
+
+        faces_detected = len(faces)
+        if not faces:
+            errors.append("No faces detected")
+
+        faces_stored = await self._store_faces(item.photo_id, faces, errors)
+        return (
+            self._build_result(item, faces_detected, faces_stored, errors),
+            faces_detected,
+            faces_stored,
+        )
+
+    async def _store_faces(
+        self,
+        photo_id: uuid.UUID,
+        faces: Sequence[DetectedFace],
+        errors: list[str],
+    ) -> int:
+        faces_stored = 0
+        for face_index, face in enumerate(faces):
+            try:
+                stored = await self._store_face(
+                    photo_id=photo_id,
+                    face_index=face_index,
+                    face=face,
+                )
+                if stored is None:
+                    raise AppException.internal_error("Failed to store face embedding")
+                await self._commit_best_effort()
+                faces_stored += 1
+            except IntegrityError as exc:
+                await self._rollback_best_effort()
+                logger.warning(
+                    "Failed to store face %s for photo %s: %s",
+                    face_index,
+                    photo_id,
+                    exc,
+                )
+                errors.append(f"face {face_index}: {exc}")
+            except Exception as exc:
+                await self._rollback_best_effort()
+                logger.warning(
+                    "Failed to store face %s for photo %s: %s",
+                    face_index,
+                    photo_id,
+                    exc,
+                )
+                errors.append(f"face {face_index}: {exc}")
+        return faces_stored
+
+    @staticmethod
+    def _build_result(
+        item: BatchImageInput,
+        faces_detected: int,
+        faces_stored: int,
+        errors: list[str],
+    ) -> BatchImageResult:
+        return BatchImageResult(
+            photo_id=item.photo_id,
+            source_type=item.source_type,
+            source=item.source,
+            faces_detected=faces_detected,
+            faces_stored=faces_stored,
+            errors=errors,
         )
 
     async def _load_payload(
