@@ -9,8 +9,6 @@ import numpy as np
 from insightface.app import FaceAnalysis  # type: ignore[import-untyped]
 from app.core.exceptions import AppException
 
-from app.core.exceptions import AppException
-
 BBox = Tuple[int, int, int, int]
 
 
