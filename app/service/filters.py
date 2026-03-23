@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from app.service.data_processor import BaseFilter
+from app.core.exceptions import AppException
 
 
 class BlurFilter(BaseFilter):
@@ -50,9 +51,9 @@ class BlurFilter(BaseFilter):
             return fixed
 
         # Step 4 — reject
-        print("[BlurFilter] REJECT — image still too blurry after fix.")
-        raise ValueError(
-            "Image rejected: too blurry and could not be recovered.")
+        raise AppException.image_blur_error(
+            f"Image is too blurry (score: {self._measure_blur(image):.2f}, threshold: {self.BLUR_THRESHOLD}) and could not be recovered."
+        )
 
 
 class BrightnessFilter(BaseFilter):
@@ -91,27 +92,20 @@ class BrightnessFilter(BaseFilter):
     def process_image(self, image: np.ndarray) -> np.ndarray:
         # Step 1 — test
         if self.verify_image(image):
-            print("[BrightnessFilter] PASS — brightness is acceptable.")
             return image
 
         brightness = self._measure_brightness(image)
-        print(
-            f"[BrightnessFilter] FAIL — brightness out of range. Applying gamma correction...")
 
         # Step 2 — fix
-        if brightness < self.MIN_BRIGHTNESS:
-            gamma = 2.0   # brighten
-        else:
-            gamma = 0.5   # darken
-
+        gamma = 2.0 if brightness < self.MIN_BRIGHTNESS else 0.5
         fixed = self._gamma_correction(image, gamma)
 
         # Step 3 — retest
         if self.verify_image(fixed):
-            print("[BrightnessFilter] PASS after fix — gamma correction worked.")
             return fixed
 
         # Step 4 — reject
-        print("[BrightnessFilter] REJECT — brightness still unacceptable after fix.")
-        raise ValueError(
-            "Image rejected: brightness out of range and could not be corrected.")
+        raise AppException.bad_request(
+            f"Image brightness {brightness:.2f} is out of acceptable range "
+            f"({self.MIN_BRIGHTNESS}–{self.MAX_BRIGHTNESS}) and could not be corrected."
+        )
