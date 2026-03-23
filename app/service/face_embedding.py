@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import List, Literal, Optional, Sequence, Tuple, TypedDict
 
-import cv2  # type: ignore
+import cv2 # type: ignore
 import numpy as np
 from insightface.app import FaceAnalysis  # type: ignore[import-untyped]
 from app.core.exceptions import AppException
