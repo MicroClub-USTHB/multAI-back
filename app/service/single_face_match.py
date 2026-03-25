@@ -9,6 +9,7 @@ import sqlalchemy
 import sqlalchemy.ext.asyncio
 
 from app.core.constant import MINIO_URL_PREFIX
+from app.core.config import settings
 from app.core.logger import logger
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from app.infra.minio import Bucket, IMAGES_BUCKET_NAME
@@ -59,8 +60,6 @@ WHERE photo_face_id = :photo_face_id
 LIMIT 1
 """
 
-MINIO_RETRY_ATTEMPTS = 3
-MINIO_RETRY_BASE_SECONDS = 0.5
 
 
 class SingleFaceMatchService:
@@ -189,7 +188,7 @@ class SingleFaceMatchService:
         bucket_name, object_name = self._parse_minio_ref(job.image_ref)
         bucket = Bucket(bucket_name, "")
         last_exc: Exception | None = None
-        for attempt in range(1, MINIO_RETRY_ATTEMPTS + 1):
+        for attempt in range(1, settings.MINIO_RETRY_ATTEMPTS + 1):
             try:
                 data, filename, content_type = await bucket.get(object_name)
                 return FaceImagePayload(
@@ -203,11 +202,11 @@ class SingleFaceMatchService:
                     "MinIO fetch failed for %s (attempt %s/%s): %s",
                     object_name,
                     attempt,
-                    MINIO_RETRY_ATTEMPTS,
+                    settings.MINIO_RETRY_ATTEMPTS,
                     exc,
                 )
-                if attempt < MINIO_RETRY_ATTEMPTS:
-                    await asyncio.sleep(MINIO_RETRY_BASE_SECONDS * attempt)
+                if attempt < settings.MINIO_RETRY_ATTEMPTS:
+                    await asyncio.sleep(settings.MINIO_RETRY_BASE_SECONDS * attempt)
         assert last_exc is not None
         raise last_exc
 
