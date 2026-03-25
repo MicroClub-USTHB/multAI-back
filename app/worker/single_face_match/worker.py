@@ -6,6 +6,7 @@ from app.container import Container
 from app.core.config import settings
 from app.core.logger import logger
 from app.infra.database import engine
+from app.infra.minio import Bucket, init_minio_client
 from app.infra.nats import NatsClient, NatsSubjects
 from app.infra.redis import RedisClient
 from app.schema.dto.single_face_match import SingleFaceMatchJob
@@ -27,10 +28,16 @@ class SingleFaceMatchWorker:
             await self.service.process_job(job)
         except Exception as exc:
             logger.exception("Failed to process single face match job: %s", exc)
-            raise
+            return
 
 
 async def run_worker() -> None:
+    await init_minio_client(
+        minio_host=settings.MINIO_HOST,
+        minio_port=settings.MINIO_API_PORT,
+        minio_root_user=settings.MINIO_ROOT_USER,
+        minio_root_password=settings.MINIO_ROOT_PASSWORD,
+    )
     RedisClient(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
@@ -54,7 +61,24 @@ async def run_worker() -> None:
         )
 
         logger.info("SingleFaceMatchWorker subscribed; waiting for jobs")
-        await asyncio.Event().wait()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await _close_minio()
+            await NatsClient.close()
+
+
+async def _close_minio() -> None:
+    client = getattr(Bucket, "client", None)
+    if client is None:
+        return
+    close_session = getattr(client, "close_session", None)
+    if close_session is None:
+        return
+    try:
+        await close_session()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
