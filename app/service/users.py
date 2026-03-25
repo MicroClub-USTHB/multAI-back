@@ -12,6 +12,7 @@ from app.core.securite import (
     decode_refresh_mobile_token,
     Get_expiry_time,
 )
+from app.core.config import settings
 from app.infra.redis import RedisClient
 
 from app.schema.request.mobile.auth import MobileAuthRequest
@@ -19,7 +20,7 @@ from app.schema.response.mobile.auth import MobileAuthResponse
 from db.generated import user as user_queries
 from db.generated import devices as device_queries
 from db.generated import session as session_queries
-from db.generated.models import User
+from db.generated.models import User, UserDevice
 from app.core.logger import logger
 from app.service.face_embedding import FaceImagePayload, FaceEmbeddingService
 
@@ -28,8 +29,8 @@ class AuthService:
     user_querier: user_queries.AsyncQuerier
     device_querier: device_queries.AsyncQuerier
     session_querier: session_queries.AsyncQuerier
-    SESSION_LIMIT = 3
-    REDIS_SESSION_TTL = 180
+    SESSION_LIMIT = settings.MOBILE_SESSION_LIMIT
+    REDIS_SESSION_TTL = settings.MOBILE_SESSION_TTL_SECONDS
 
     def __init__(
         self,
@@ -42,6 +43,37 @@ class AuthService:
         self.device_querier = device_querier
         self.session_querier = session_querier
         self.face_embedding_service = face_embedding_service
+
+    async def _ensure_device_for_login(
+        self,
+        user_id: uuid.UUID,
+        req: MobileAuthRequest,
+    ) -> UserDevice:
+        existing_device = await self.device_querier.get_device__by_id(id=req.device_id)
+
+        if existing_device:
+            if existing_device.user_id != user_id:
+                raise AppException.forbidden("Device already registered to another user")
+            if existing_device.is_invalid_token:
+                raise AppException.forbidden(
+                    "Device push token is invalid. Update the token before logging in."
+                )
+            if not existing_device.is_active:
+                await self.device_querier.activate_device(id=req.device_id, user_id=user_id)
+            return existing_device
+
+        device = await self.device_querier.create_device(
+            arg=device_queries.CreateDeviceParams(
+                column_1=req.device_id,
+                user_id=user_id,
+                device_name=req.device_name,
+                device_type=req.device_type,
+                totp_secret=None,
+            )
+        )
+        if not device:
+            raise AppException.internal_error("Failed to create device")
+        return device
 
     async def mobile_register_login(
         self,
@@ -84,22 +116,11 @@ class AuthService:
             raise AppException.forbidden("Maximum session limit reached")
 
         device_id = req.device_id
-        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-
-        device = await self.device_querier.create_device(
-            arg=device_queries.CreateDeviceParams(
-            column_1=device_id,
-            user_id=user_id,
-            device_name=req.device_name,
-            device_type=req.device_type,
-            totp_secret=None,
-
-            )
-
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            days=settings.MOBILE_SESSION_DAYS
         )
 
-        if not device:
-            raise AppException.internal_error("Failed to create device")
+        await self._ensure_device_for_login(user_id, req)
 
         session = await self.session_querier.upsert_session(
             user_id=user_id,
@@ -186,9 +207,14 @@ class AuthService:
         averaging = await self.face_embedding_service.compute_average_embedding(
             image_payloads
         )
+        # pgvector accepts input like: "[0.1, 0.2, ...]". Convert list to a vector literal.
+        vector_literal = "[" + ", ".join(str(x) for x in averaging) + "]"
         #TODO:we encrypt it here we wont store it as plaintext in the db  but the porblmem is were lossing the search as trade of in the vestor so i will let it like this until i found somthing tht fit
         # encrypted_embedding = EmbeddingCrypto.encrypt(averaging)
-        user = await self.user_querier.set_user_embedding(id=user_id,face_embedding=averaging)
+        user = await self.user_querier.set_user_embedding(
+            dollar_1=vector_literal,
+            id=user_id,
+        )
         if not user:
             raise AppException.internal_error("Failed to set user embedding")
 

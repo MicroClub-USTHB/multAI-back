@@ -2,3 +2,8 @@
 .env.staging
 __pycache__
 db/schema.sql
+
+.vscode/settings.json
+multiai-c9380-firebase-adminsdk-fbsvc-cb6e5ce41b.json
+db.txt
+

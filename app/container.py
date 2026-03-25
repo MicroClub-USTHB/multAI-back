@@ -11,8 +11,11 @@ from app.service.staged_upload_storage import StagedUploadStorageService
 from app.service.staff_drive import StaffDriveService
 from app.service.staff_notifications import StaffNotificationsService
 from app.service.staff_user import StaffUserService
+
+from app.service.audit import AuditService
 from app.service.upload_requests import UploadRequestsService
 from app.service.users import AuthService
+from app.service.user_notification import UserNotificationService
 from db.generated import devices as device_queries
 from db.generated import photos as photo_queries
 from db.generated import session as session_queries
@@ -23,6 +26,15 @@ from db.generated import upload_request_groups as upload_request_group_queries
 from db.generated import upload_request_photos as upload_request_photo_queries
 from db.generated import upload_requests as upload_request_queries
 from db.generated import user as user_queries
+
+from db.generated import events as event_queries
+from db.generated import eventParticipant as participant_queries
+from db.generated import stuff_user as staff_queries
+from db.generated import notifications as notification_queries
+from db.generated import audit as audit_queries
+from app.service.event import EventService
+from app.worker.notification.notification_queue import NotificationQueue
+from app.worker.notification.settings import NotifSetting
 
 class Container:
     def __init__(
@@ -45,6 +57,12 @@ class Container:
         self.upload_request_photo_querier = upload_request_photo_queries.AsyncQuerier(conn)
         self.photo_querier = photo_queries.AsyncQuerier(conn)
         self.staff_notification_querier = staff_notification_queries.AsyncQuerier(conn)
+        self.notification_querier = notification_queries.AsyncQuerier(conn)
+        self.audit_querier = audit_queries.AsyncQuerier(conn)
+        self.event_querier = event_queries.AsyncQuerier(conn)
+        self.participant_querier = participant_queries.AsyncQuerier(conn)
+        self.staff_querier = staff_queries.AsyncQuerier(conn)
+
 
         # services
         self.session_service = SessionService()
@@ -52,6 +70,7 @@ class Container:
             session=self.session_querier,
             redis=self.redis,
         )
+
 
         self.device_service = DeviceService()
         self.device_service.init(
@@ -86,9 +105,26 @@ class Container:
             staff_notifications_service=self.staff_notifications_service,
         )
 
+        notification_queue = NotificationQueue(settings=NotifSetting)
+
+        self.user_notifications_service = UserNotificationService(
+            notification_querier=self.notification_querier,
+            notification_queue=notification_queue,
+        )
+
+        self.audit_service = AuditService(
+            audit_querier=self.audit_querier,
+            user_querier=self.user_querier,
+        )
+
         self.staff_user_service = StaffUserService()
+
         self.staff_user_service.init(
-            staff_user_querier=self.staff_user_querier,
+            staff_user_querier=self.staff_user_querier,)
+
+        self.event_service = EventService(
+            e_querier=self.event_querier,
+            p_querier=self.participant_querier,
         )
 
 async def get_container(
