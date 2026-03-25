@@ -7,6 +7,7 @@ from typing import List, Literal, Optional, Sequence, Tuple, TypedDict
 import cv2 # type: ignore
 import numpy as np
 from insightface.app import FaceAnalysis  # type: ignore[import-untyped]
+from app.core.config import settings
 from app.core.exceptions import AppException
 
 
@@ -37,15 +38,26 @@ class DetectedFace:
 class FaceEmbedding:
     def __init__(
         self,
-        model_name: str = "buffalo_l",
-        providers: Sequence[str] = ("CPUExecutionProvider",),
-        ctx_id: int = -1,
-        det_size: Tuple[int, int] = (640, 640),
+        model_name: str | None = None,
+        providers: Sequence[str] | None = None,
+        ctx_id: int | None = None,
+        det_size: Tuple[int, int] | None = None,
     ) -> None:
         self.model: FaceAnalysis | None = None
-        self.model_name = model_name
+        self.model_name = model_name or settings.FACE_EMBEDDING_MODEL_NAME
+        if providers is None:
+            providers = tuple(
+                p.strip()
+                for p in settings.FACE_EMBEDDING_PROVIDERS.split(",")
+                if p.strip()
+            )
         self.providers = providers
-        self.ctx_id = ctx_id
+        self.ctx_id = settings.FACE_EMBEDDING_CTX_ID if ctx_id is None else ctx_id
+        if det_size is None:
+            det_size = (
+                settings.FACE_EMBEDDING_DET_WIDTH,
+                settings.FACE_EMBEDDING_DET_HEIGHT,
+            )
         self.det_size = det_size
         self._initialized = False
 
