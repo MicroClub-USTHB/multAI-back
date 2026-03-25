@@ -19,7 +19,7 @@ from app.schema.response.mobile.auth import MobileAuthResponse
 from db.generated import user as user_queries
 from db.generated import devices as device_queries
 from db.generated import session as session_queries
-from db.generated.models import User
+from db.generated.models import User, UserDevice
 from app.core.logger import logger
 from app.service.face_embedding import FaceImagePayload, FaceEmbeddingService
 
@@ -42,6 +42,37 @@ class AuthService:
         self.device_querier = device_querier
         self.session_querier = session_querier
         self.face_embedding_service = face_embedding_service
+
+    async def _ensure_device_for_login(
+        self,
+        user_id: uuid.UUID,
+        req: MobileAuthRequest,
+    ) -> UserDevice:
+        existing_device = await self.device_querier.get_device__by_id(id=req.device_id)
+
+        if existing_device:
+            if existing_device.user_id != user_id:
+                raise AppException.forbidden("Device already registered to another user")
+            if existing_device.is_invalid_token:
+                raise AppException.forbidden(
+                    "Device push token is invalid. Update the token before logging in."
+                )
+            if not existing_device.is_active:
+                await self.device_querier.activate_device(id=req.device_id, user_id=user_id)
+            return existing_device
+
+        device = await self.device_querier.create_device(
+            arg=device_queries.CreateDeviceParams(
+                column_1=req.device_id,
+                user_id=user_id,
+                device_name=req.device_name,
+                device_type=req.device_type,
+                totp_secret=None,
+            )
+        )
+        if not device:
+            raise AppException.internal_error("Failed to create device")
+        return device
 
     async def mobile_register_login(
         self,
@@ -86,33 +117,7 @@ class AuthService:
         device_id = req.device_id
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
 
-        existing_device = await self.device_querier.get_device__by_id(id=device_id)
-
-        if existing_device:
-            if existing_device.user_id != user_id:
-                raise AppException.forbidden("Device already registered to another user")
-            if existing_device.is_invalid_token:
-                raise AppException.forbidden(
-                    "Device push token is invalid. Update the token before logging in."
-                )
-            if not existing_device.is_active:
-                await self.device_querier.activate_device(
-                    id=device_id,
-                    user_id=user_id,
-                )
-        else:
-            device = await self.device_querier.create_device(
-                arg=device_queries.CreateDeviceParams(
-                    column_1=device_id,
-                    user_id=user_id,
-                    device_name=req.device_name,
-                    device_type=req.device_type,
-                    totp_secret=None,
-                )
-            )
-
-            if not device:
-                raise AppException.internal_error("Failed to create device")
+        await self._ensure_device_for_login(user_id, req)
 
         session = await self.session_querier.upsert_session(
             user_id=user_id,
