@@ -62,6 +62,12 @@ ORDER BY created_at DESC
 LIMIT :p1 OFFSET :p2
 """
 
+LIST_USERS_WITH_EMBEDDING = """-- name: list_users_with_embedding \\:many
+SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at
+FROM users
+WHERE face_embedding IS NOT NULL
+AND deleted_at IS NULL
+"""
 
 SET_USER_BLOCKED = """-- name: set_user_blocked \\:one
 UPDATE users
