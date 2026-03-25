@@ -9,12 +9,18 @@ from miniopy_async.api import Minio
 
 from app.core.utils import check_extension
 from app.core.exceptions import AppException
-from app.core.constant import DEFAULT_CONTENT_TYPE
+from app.core.constant import (
+    DEFAULT_CONTENT_TYPE,
+    DOCUMENTS_BUCKET_NAME as CORE_DOCUMENTS_BUCKET_NAME,
+    IMAGES_BUCKET_NAME as CORE_IMAGES_BUCKET_NAME,
+    WA_SIM_BUCKET_NAME as CORE_WA_SIM_BUCKET_NAME,
+)
 
 
-IMAGES_BUCKET_NAME = "images"
-DOCUMENTS_BUCKET_NAME = "documents"
-WA_SIM_BUCKET_NAME = "wa-sim"
+# Re-export bucket names for compatibility with existing imports.
+IMAGES_BUCKET_NAME = CORE_IMAGES_BUCKET_NAME
+DOCUMENTS_BUCKET_NAME = CORE_DOCUMENTS_BUCKET_NAME
+WA_SIM_BUCKET_NAME = CORE_WA_SIM_BUCKET_NAME
 
 async def init_minio_client(
     minio_host: str, minio_port: int, minio_root_user: str, minio_root_password: str
