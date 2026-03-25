@@ -29,7 +29,7 @@ class NatsSubjects(Enum):
     STAFF_UPLOAD_REQUEST_CREATED = "staff.upload_request.created"
     STAFF_UPLOAD_REQUEST_APPROVED = "staff.upload_request.approved"
     STAFF_UPLOAD_REQUEST_REJECTED = "staff.upload_request.rejected"
-    BATCH_FACE_EMBEDDINGS_REQUESTED = "photo_faces.batch.requested"
+    SINGLE_FACE_MATCH_REQUESTED = "photo_faces.single.requested"
 
 class NatsClient:
     _nc: Optional[NATS] = None

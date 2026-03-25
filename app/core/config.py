@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     NATS_HOST: str
     NATS_PASSWORD: str
     NATS_USER: str
-    NATS_FACE_EMBEDDING_STREAM: str = "face_embeddings"
-    NATS_FACE_EMBEDDING_DURABLE: str = "face_embeddings_worker"
+    NATS_SINGLE_FACE_MATCH_STREAM: str = "single_face_matches"
+    NATS_SINGLE_FACE_MATCH_DURABLE: str = "single_face_match_worker"
 
 
     # MinIO

@@ -5,8 +5,6 @@ from app.deps.ai_deps import get_face_embedding_service
 from app.infra.database import get_db
 from app.infra.redis import RedisClient
 from app.service.device import DeviceService
-from app.service.batch_face_embedding import BatchFaceEmbeddingService
-from app.service.batch_face_embedding_queue import BatchFaceEmbeddingQueueService
 from app.service.face_embedding import FaceEmbeddingService
 from app.service.session import SessionService
 from app.service.staged_upload_storage import StagedUploadStorageService
@@ -106,7 +104,6 @@ class Container:
             staff_notifications_service=self.staff_notifications_service,
         )
 
-<<<<<<< HEAD
         notification_queue = NotificationQueue(settings=NotifSetting)
 
         self.user_notifications_service = UserNotificationService(
@@ -117,18 +114,9 @@ class Container:
         self.audit_service = AuditService(
             audit_querier=self.audit_querier,
             user_querier=self.user_querier,
-=======
-        self.batch_face_embedding_service = BatchFaceEmbeddingService(
-            face_embedding_service=self.face_embedding_service,
-            staff_drive_service=self.staff_drive_service,
-            photo_face_querier=self.photo_face_querier,
->>>>>>> 08a1d9f (feat: wire batch face embedding service in container)
         )
 
-        self.batch_face_embedding_queue_service = BatchFaceEmbeddingQueueService()
-
         self.staff_user_service = StaffUserService()
-
         self.staff_user_service.init(
             staff_user_querier=self.staff_user_querier,)
 
