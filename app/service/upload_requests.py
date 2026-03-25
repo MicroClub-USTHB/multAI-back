@@ -331,11 +331,13 @@ class UploadRequestsService:
                 )
                 finalized_storage_keys.append(final_storage_key)
                 created_photo = await self.photo_querier.create_photo(
-                    event_id=existing.event_id,
-                    storage_key=final_storage_key,
-                    taken_at=staged_photo.taken_at,
-                    day_number=staged_photo.day_number,
-                    visibility=staged_photo.visibility,
+                    photo_queries.CreatePhotoParams(
+                        event_id=existing.event_id,
+                        storage_key=final_storage_key,
+                        taken_at=staged_photo.taken_at,
+                        day_number=staged_photo.day_number,
+                        visibility=staged_photo.visibility,
+                    )
                 )
                 if created_photo is None:
                     raise AppException.internal_error("Failed to finalize staged photo")
