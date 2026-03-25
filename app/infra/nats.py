@@ -2,12 +2,17 @@ from enum import Enum
 from typing import Any, Callable, Optional
 from nats.aio.client import Client as NATS
 from nats.js.client import JetStreamContext
-from nats.js.api import DeliverPolicy, AckPolicy
+from nats.js.api import DeliverPolicy, AckPolicy, StreamConfig
+from nats.js.errors import NotFoundError
 from nats.aio.msg import Msg
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.core.constant import AUDIT_EVENT_SUBJECT, NOTIFICATION_EVENT_SUBJECT
+from app.core.constant import (
+    AUDIT_EVENT_SUBJECT,
+    FINAL_BUCKET_CLEANUP_SUBJECT,
+    NOTIFICATION_EVENT_SUBJECT,
+)
 
 
 class Message(BaseModel):
@@ -23,9 +28,11 @@ class NatsSubjects(Enum):
     STAFF_UPLOAD_GROUP_CREATED = "staff.upload_group.created"
     STAFF_UPLOAD_GROUP_APPROVED = "staff.upload_group.approved"
     STAFF_UPLOAD_GROUP_REJECTED = "staff.upload_group.rejected"
+    FINAL_BUCKET_CLEANUP = FINAL_BUCKET_CLEANUP_SUBJECT
     STAFF_UPLOAD_REQUEST_CREATED = "staff.upload_request.created"
     STAFF_UPLOAD_REQUEST_APPROVED = "staff.upload_request.approved"
     STAFF_UPLOAD_REQUEST_REJECTED = "staff.upload_request.rejected"
+    SINGLE_FACE_MATCH_REQUESTED = "photo_faces.single.requested"
 
 
 class NatsClient:
@@ -102,6 +109,8 @@ class NatsClient:
         if NatsClient._js is None:
             await NatsClient.connect()
 
+        await NatsClient.ensure_stream(stream_name=stream_name, subjects=[subject.value])
+
         async def _wrapper(msg: Msg) -> None:
             await callback(msg.data)
             await msg.ack()
@@ -115,3 +124,20 @@ class NatsClient:
             deliver_policy=DeliverPolicy.NEW,
             # ack_policy=ack_policy
         )
+
+    @staticmethod
+    async def ensure_stream(*, stream_name: str, subjects: list[str]) -> None:
+        if NatsClient._js is None:
+            await NatsClient.connect()
+        js = NatsClient._js
+        assert js is not None
+        try:
+            await js.stream_info(stream_name)
+        except NotFoundError:
+            await js.add_stream(
+                name=stream_name,
+                config=StreamConfig(
+                    name=stream_name,
+                    subjects=subjects,
+                ),
+            )

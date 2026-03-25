@@ -43,6 +43,8 @@ async def get_current_mobile_user(
     user = await container.auth_service.user_querier.get_user_by_id(id=session.user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.blocked:
+        raise HTTPException(status_code=403, detail="User is blocked")
 
     return MobileUserSchema(
         user_id=user.id,

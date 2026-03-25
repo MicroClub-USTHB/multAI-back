@@ -9,12 +9,12 @@ from email.message import Message
 
 from app.core.exceptions import AppException
 from app.core.config import settings
-
-
-GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
-GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
-GOOGLE_DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files/{file_id}"
+from app.core.constant import (
+    GOOGLE_AUTH_URL,
+    GOOGLE_DRIVE_FILES_URL,
+    GOOGLE_TOKEN_URL,
+    GOOGLE_USERINFO_URL,
+)
 GOOGLE_DRIVE_LIST_FILES_URL = "https://www.googleapis.com/drive/v3/files"
 
 
