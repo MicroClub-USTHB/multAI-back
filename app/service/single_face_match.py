@@ -74,7 +74,7 @@ class SingleFaceMatchService:
         self.face_embedding_service = face_embedding_service
         self.photo_face_querier = photo_face_querier
 
-    async def process_job(self, job: SingleFaceMatchJob) -> None:
+    async def process_job(self, job: SingleFaceMatchJob) -> None:  # noqa: C901
         if job.faces_detected is not None and job.faces_detected != 1:
             logger.info(
                 "Skipping photo %s: faces_detected=%s (single-face worker)",

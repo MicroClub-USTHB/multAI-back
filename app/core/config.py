@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -70,6 +71,17 @@ class Settings(BaseSettings):
         env_file=".env",
         extra="ignore",
     )
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def _parse_debug(cls, value):  # type: ignore[no-untyped-def]
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"release", "prod", "production", "false", "0", "no"}:
+                return False
+            if lowered in {"true", "1", "yes"}:
+                return True
+        return value
 
 
 settings = Settings()  # type: ignore

@@ -125,12 +125,6 @@ class FaceEmbedding:
         return embedding.tolist()
 
 
-class DetectedFace:
-    def __init__(self, embedding: list[float], bbox: tuple[float, float, float, float]):
-        self.embedding = embedding
-        self.bbox = bbox
-
-
 class FaceEmbeddingService:
     def __init__(self, face_embedding: FaceEmbedding | None = None) -> None:
         self.face_embedding = face_embedding or FaceEmbedding()

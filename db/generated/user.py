@@ -14,11 +14,7 @@ from db.generated import models
 CREATE_USER = """-- name: create_user \\:one
 INSERT INTO users (email, hashed_password)
 VALUES (:p1, :p2)
-<<<<<<< HEAD
-RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
-=======
-RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
->>>>>>> 7ef7381 (chore: update generated db queriers)
+RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, blocked, deleted_at
 """
 
 
@@ -29,33 +25,21 @@ WHERE id = :p1
 
 
 GET_USER_BY_EMAIL = """-- name: get_user_by_email \\:one
-<<<<<<< HEAD
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
-=======
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
->>>>>>> 7ef7381 (chore: update generated db queriers)
+SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, blocked, deleted_at
 FROM users
 WHERE email = :p1
 """
 
 
 GET_USER_BY_ID = """-- name: get_user_by_id \\:one
-<<<<<<< HEAD
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
-=======
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
->>>>>>> 7ef7381 (chore: update generated db queriers)
+SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, blocked, deleted_at
 FROM users
 WHERE id = :p1
 """
 
 
 LIST_USERS = """-- name: list_users \\:many
-<<<<<<< HEAD
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
-=======
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
->>>>>>> 7ef7381 (chore: update generated db queriers)
+SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, blocked, deleted_at
 FROM users
 ORDER BY created_at DESC
 LIMIT :p1 OFFSET :p2
@@ -76,7 +60,6 @@ UPDATE users
 SET face_embedding = :p1\\:\\:vector,
     updated_at = NOW()
 WHERE id = :p2
-<<<<<<< HEAD
 RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, blocked, deleted_at
 """
 
@@ -89,9 +72,6 @@ SET email = COALESCE(:p1, email),
     updated_at = NOW()
 WHERE id = :p4
 RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, blocked, deleted_at
-=======
-RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
->>>>>>> 7ef7381 (chore: update generated db queriers)
 """
 
 
@@ -100,11 +80,7 @@ UPDATE users
 SET hashed_password = :p1,
     updated_at = NOW()
 WHERE id = :p2
-<<<<<<< HEAD
 RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, blocked, deleted_at
-=======
-RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
->>>>>>> 7ef7381 (chore: update generated db queriers)
 """
 
 
@@ -112,8 +88,14 @@ class AsyncQuerier:
     def __init__(self, conn: sqlalchemy.ext.asyncio.AsyncConnection):
         self._conn = conn
 
-    async def create_user(self, *, email: str, hashed_password: Optional[str]) -> Optional[models.User]:
-        row = (await self._conn.execute(sqlalchemy.text(CREATE_USER), {"p1": email, "p2": hashed_password})).first()
+    async def create_user(
+        self, *, email: str, hashed_password: Optional[str]
+    ) -> Optional[models.User]:
+        row = (
+            await self._conn.execute(
+                sqlalchemy.text(CREATE_USER), {"p1": email, "p2": hashed_password}
+            )
+        ).first()
         if row is None:
             return None
         return models.User(
@@ -124,20 +106,19 @@ class AsyncQuerier:
             updated_at=row[4],
             display_name=row[5],
             face_embedding=row[6],
-<<<<<<< HEAD
             blocked=row[7],
             deleted_at=row[8],
-=======
-            deleted_at=row[7],
-            blocked=row[8],
->>>>>>> 7ef7381 (chore: update generated db queriers)
         )
 
     async def delete_user(self, *, id: uuid.UUID) -> None:
         await self._conn.execute(sqlalchemy.text(DELETE_USER), {"p1": id})
 
     async def get_user_by_email(self, *, email: str) -> Optional[models.User]:
-        row = (await self._conn.execute(sqlalchemy.text(GET_USER_BY_EMAIL), {"p1": email})).first()
+        row = (
+            await self._conn.execute(
+                sqlalchemy.text(GET_USER_BY_EMAIL), {"p1": email}
+            )
+        ).first()
         if row is None:
             return None
         return models.User(
@@ -148,17 +129,14 @@ class AsyncQuerier:
             updated_at=row[4],
             display_name=row[5],
             face_embedding=row[6],
-<<<<<<< HEAD
             blocked=row[7],
             deleted_at=row[8],
-=======
-            deleted_at=row[7],
-            blocked=row[8],
->>>>>>> 7ef7381 (chore: update generated db queriers)
         )
 
     async def get_user_by_id(self, *, id: uuid.UUID) -> Optional[models.User]:
-        row = (await self._conn.execute(sqlalchemy.text(GET_USER_BY_ID), {"p1": id})).first()
+        row = (
+            await self._conn.execute(sqlalchemy.text(GET_USER_BY_ID), {"p1": id})
+        ).first()
         if row is None:
             return None
         return models.User(
@@ -169,17 +147,16 @@ class AsyncQuerier:
             updated_at=row[4],
             display_name=row[5],
             face_embedding=row[6],
-<<<<<<< HEAD
             blocked=row[7],
             deleted_at=row[8],
-=======
-            deleted_at=row[7],
-            blocked=row[8],
->>>>>>> 7ef7381 (chore: update generated db queriers)
         )
 
-    async def list_users(self, *, limit: int, offset: int) -> AsyncIterator[models.User]:
-        result = await self._conn.stream(sqlalchemy.text(LIST_USERS), {"p1": limit, "p2": offset})
+    async def list_users(
+        self, *, limit: int, offset: int
+    ) -> AsyncIterator[models.User]:
+        result = await self._conn.stream(
+            sqlalchemy.text(LIST_USERS), {"p1": limit, "p2": offset}
+        )
         async for row in result:
             yield models.User(
                 id=row[0],
@@ -189,17 +166,16 @@ class AsyncQuerier:
                 updated_at=row[4],
                 display_name=row[5],
                 face_embedding=row[6],
-<<<<<<< HEAD
                 blocked=row[7],
                 deleted_at=row[8],
-=======
-                deleted_at=row[7],
-                blocked=row[8],
->>>>>>> 7ef7381 (chore: update generated db queriers)
             )
 
     async def set_user_blocked(self, *, blocked: bool, id: uuid.UUID) -> Optional[models.User]:
-        row = (await self._conn.execute(sqlalchemy.text(SET_USER_BLOCKED), {"p1": blocked, "p2": id})).first()
+        row = (
+            await self._conn.execute(
+                sqlalchemy.text(SET_USER_BLOCKED), {"p1": blocked, "p2": id}
+            )
+        ).first()
         if row is None:
             return None
         return models.User(
@@ -215,7 +191,11 @@ class AsyncQuerier:
         )
 
     async def set_user_embedding(self, *, dollar_1: Any, id: uuid.UUID) -> Optional[models.User]:
-        row = (await self._conn.execute(sqlalchemy.text(SET_USER_EMBEDDING), {"p1": dollar_1, "p2": id})).first()
+        row = (
+            await self._conn.execute(
+                sqlalchemy.text(SET_USER_EMBEDDING), {"p1": dollar_1, "p2": id}
+            )
+        ).first()
         if row is None:
             return None
         return models.User(
@@ -226,18 +206,29 @@ class AsyncQuerier:
             updated_at=row[4],
             display_name=row[5],
             face_embedding=row[6],
-<<<<<<< HEAD
             blocked=row[7],
             deleted_at=row[8],
         )
 
-    async def update_user(self, *, email: str, display_name: Optional[str], blocked: bool, id: uuid.UUID) -> Optional[models.User]:
-        row = (await self._conn.execute(sqlalchemy.text(UPDATE_USER), {
-            "p1": email,
-            "p2": display_name,
-            "p3": blocked,
-            "p4": id,
-        })).first()
+    async def update_user(
+        self,
+        *,
+        email: str,
+        display_name: Optional[str],
+        blocked: bool,
+        id: uuid.UUID,
+    ) -> Optional[models.User]:
+        row = (
+            await self._conn.execute(
+                sqlalchemy.text(UPDATE_USER),
+                {
+                    "p1": email,
+                    "p2": display_name,
+                    "p3": blocked,
+                    "p4": id,
+                },
+            )
+        ).first()
         if row is None:
             return None
         return models.User(
@@ -250,14 +241,17 @@ class AsyncQuerier:
             face_embedding=row[6],
             blocked=row[7],
             deleted_at=row[8],
-=======
-            deleted_at=row[7],
-            blocked=row[8],
->>>>>>> 7ef7381 (chore: update generated db queriers)
         )
 
-    async def update_user_password(self, *, hashed_password: Optional[str], id: uuid.UUID) -> Optional[models.User]:
-        row = (await self._conn.execute(sqlalchemy.text(UPDATE_USER_PASSWORD), {"p1": hashed_password, "p2": id})).first()
+    async def update_user_password(
+        self, *, hashed_password: Optional[str], id: uuid.UUID
+    ) -> Optional[models.User]:
+        row = (
+            await self._conn.execute(
+                sqlalchemy.text(UPDATE_USER_PASSWORD),
+                {"p1": hashed_password, "p2": id},
+            )
+        ).first()
         if row is None:
             return None
         return models.User(
@@ -268,11 +262,6 @@ class AsyncQuerier:
             updated_at=row[4],
             display_name=row[5],
             face_embedding=row[6],
-<<<<<<< HEAD
             blocked=row[7],
             deleted_at=row[8],
-=======
-            deleted_at=row[7],
-            blocked=row[8],
->>>>>>> 7ef7381 (chore: update generated db queriers)
         )
