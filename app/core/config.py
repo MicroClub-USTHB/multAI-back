@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     MINIO_ROOT_USER: str
     MINIO_ROOT_PASSWORD: str
     MINIO_HOST: str
+    MINIO_RETRY_ATTEMPTS: int = 3
+    MINIO_RETRY_BASE_SECONDS: float = 0.5
 
     # PostgreSQL
     POSTGRES_USER: str
@@ -45,6 +47,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     encryption_key: str
     totp_issuer: str = "multAI"
+
+    # Face embedding model
+    FACE_EMBEDDING_MODEL_NAME: str = "buffalo_l"
+    FACE_EMBEDDING_PROVIDERS: str = "CPUExecutionProvider"
+    FACE_EMBEDDING_CTX_ID: int = -1
+    FACE_EMBEDDING_DET_WIDTH: int = 640
+    FACE_EMBEDDING_DET_HEIGHT: int = 640
 
     # Google Drive OAuth
     GOOGLE_CLIENT_ID: str = ""
