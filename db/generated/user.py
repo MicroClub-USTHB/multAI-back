@@ -186,7 +186,22 @@ class AsyncQuerier:
                 blocked=row[8],
             )
 
-async def set_user_blocked(self, *, blocked: bool, id: uuid.UUID) -> Optional[models.User]:
+    async def list_users_with_embedding(self) -> AsyncIterator[models.User]:
+        result = await self._conn.stream(sqlalchemy.text(LIST_USERS_WITH_EMBEDDING))
+        async for row in result:
+            yield models.User(
+                id=row[0],
+                email=row[1],
+                hashed_password=row[2],
+                created_at=row[3],
+                updated_at=row[4],
+                display_name=row[5],
+                face_embedding=row[6],
+                blocked=row[7],
+                deleted_at=row[8],
+            )
+
+    async def set_user_blocked(self, *, blocked: bool, id: uuid.UUID) -> Optional[models.User]:
         row = (
             await self._conn.execute(
                 sqlalchemy.text(SET_USER_BLOCKED), {"p1": blocked, "p2": id}
@@ -206,35 +221,7 @@ async def set_user_blocked(self, *, blocked: bool, id: uuid.UUID) -> Optional[mo
             blocked=row[8],
         )
 
-async def list_users_with_embedding(self) -> AsyncIterator[models.User]:
-        result = await self._conn.stream(sqlalchemy.text(LIST_USERS_WITH_EMBEDDING))
-        async for row in result:
-            yield models.User(
-                id=row[0],
-                email=row[1],
-                hashed_password=row[2],
-                created_at=row[3],
-                updated_at=row[4],
-                display_name=row[5],
-                face_embedding=row[6],
-                blocked=row[7],
-                deleted_at=row[8],
-            )
-        if row is None:
-            return None
-        return models.User(
-            id=row[0],
-            email=row[1],
-            hashed_password=row[2],
-            created_at=row[3],
-            updated_at=row[4],
-            display_name=row[5],
-            face_embedding=row[6],
-            blocked=row[7],
-            deleted_at=row[8],
-        )
-
-async def set_user_embedding(self, *, dollar_1: Any, id: uuid.UUID) -> Optional[models.User]:
+    async def set_user_embedding(self, *, dollar_1: Any, id: uuid.UUID) -> Optional[models.User]:
         row = (
             await self._conn.execute(
                 sqlalchemy.text(SET_USER_EMBEDDING), {"p1": dollar_1, "p2": id}
@@ -254,7 +241,7 @@ async def set_user_embedding(self, *, dollar_1: Any, id: uuid.UUID) -> Optional[
             blocked=row[8],
         )
 
-async def update_user(
+    async def update_user(
         self,
         *,
         email: str,
@@ -287,7 +274,7 @@ async def update_user(
             blocked=row[8],
         )
 
-async def update_user_password(
+    async def update_user_password(
         self, *, hashed_password: Optional[str], id: uuid.UUID
     ) -> Optional[models.User]:
         row = (
@@ -306,6 +293,6 @@ async def update_user_password(
             updated_at=row[4],
             display_name=row[5],
             face_embedding=row[6],
-            deleted_at=row[7],
-            blocked=row[8],
+            blocked=row[7],
+            deleted_at=row[8],
         )
