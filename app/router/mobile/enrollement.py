@@ -69,7 +69,7 @@ async def enroll_face(
 
         image_payloads.append(payload)
 
-    return await container.auth_service.add_embbed_user(
+    return await container.auth_service.add_embedded_user(
         user.user_id,
         image_payloads,
     )

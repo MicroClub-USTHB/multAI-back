@@ -30,7 +30,7 @@ def verify_password(password: str, hashed: str) -> bool:
     return result
 
 
-def Get_expiry_time() -> int:
+def get_expiry_time() -> int:
     if settings.environment == "dev":
         expiry = 60 * 60 * 24 * 7
     else:
@@ -38,11 +38,11 @@ def Get_expiry_time() -> int:
     return expiry
 
 
-def create_acces_mobile_token(session_id: str) -> str:
+def create_access_mobile_token(session_id: str) -> str:
     payload: dict[str, Any] = {
         "session_id": session_id,
         "exp": int(
-            (datetime.now(timezone.utc) + timedelta(seconds=Get_expiry_time())).timestamp()
+            (datetime.now(timezone.utc) + timedelta(seconds=get_expiry_time())).timestamp()
         ),
     }
     return jwt.encode(payload, key=settings.jwt_secret, algorithm=settings.jwt_algorithm)
@@ -62,7 +62,7 @@ def create_refresh_mobile_token(session_id: str) -> str:
     payload: dict[str, Any] = {
         "session_id": session_id,
         "exp": int(
-            (datetime.now(timezone.utc) + timedelta(seconds=Get_expiry_time() * 4)).timestamp()
+            (datetime.now(timezone.utc) + timedelta(seconds=get_expiry_time() * 4)).timestamp()
         ),
     }
     return jwt.encode(payload, key=settings.jwt_secret, algorithm=settings.jwt_algorithm)
@@ -91,19 +91,6 @@ def verify_totp_token_with_window(secret: str, token: str, valid_window: int = 8
     totp = pyotp.TOTP(secret)
     return totp.verify(token, valid_window=valid_window)
 
-
-def generate_Acces_token_stuff(user_id: str, role: str) -> str:
-    payload: dict[str, Any] = {
-        "user_id": user_id,
-        "role": role,
-        "exp": int(
-            (datetime.now(timezone.utc) + timedelta(seconds=Get_expiry_time())).timestamp()
-        ),
-    }
-    return jwt.encode(payload, key=settings.jwt_secret, algorithm=settings.jwt_algorithm)
-
-
-
 # class EmbeddingCrypto:
 #     _key: bytes = base64.b64decode(settings.FACE_ENCRYPTION_KEY)
 #     _aes: AESGCM = AESGCM(_key)
@@ -126,7 +113,6 @@ def generate_Acces_token_stuff(user_id: str, role: str) -> str:
 
 #         return np.frombuffer(data, dtype=np.float32)
 
-
 class StaffJWTPayload(BaseModel):
     sub: str
     role: str
@@ -147,7 +133,7 @@ def create_access_staff_token(staff_id: str, role: str) -> str:
         role=role,
         type="access",
         exp=int(
-            (datetime.now(timezone.utc) + timedelta(seconds=Get_expiry_time())).timestamp()
+            (datetime.now(timezone.utc) + timedelta(seconds=get_expiry_time())).timestamp()
         ),
     )
     return jwt.encode(
@@ -166,7 +152,7 @@ def create_refresh_staff_token(staff_id: str, role: str) -> str:
         role=role,
         type="refresh",
         exp=int(
-            (datetime.now(timezone.utc) + timedelta(seconds=Get_expiry_time() * 4)).timestamp()
+            (datetime.now(timezone.utc) + timedelta(seconds=get_expiry_time() * 4)).timestamp()
         ),
     )
     return jwt.encode(

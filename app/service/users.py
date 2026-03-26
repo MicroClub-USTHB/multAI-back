@@ -5,10 +5,10 @@ from app.core.exceptions import AppException, DBException
 from app.core.securite import (
     hash_password,
     verify_password,
-    create_acces_mobile_token,
+    create_access_mobile_token,
     create_refresh_mobile_token,
     decode_refresh_mobile_token,
-    Get_expiry_time,
+    get_expiry_time,
 )
 from app.core import constant
 from app.core.config import settings
@@ -26,6 +26,7 @@ from app.schema.internal.single_face_match import ClosestUserMatch
 
 
 class AuthService:
+    """Authentication and user account service for mobile flows."""
     user_querier: user_queries.AsyncQuerier
     device_querier: device_queries.AsyncQuerier
     session_querier: session_queries.AsyncQuerier
@@ -135,9 +136,9 @@ class AuthService:
             session_key, str(session.id), expire=AuthService.REDIS_SESSION_TTL
         )
 
-        access_token = create_acces_mobile_token(str(session.id))
+        access_token = create_access_mobile_token(str(session.id))
         refresh_token = create_refresh_mobile_token(str(session.id))
-        expiry = Get_expiry_time()
+        expiry = get_expiry_time()
         logger.info("created session %s for user %s", session.id, user_id)
 
         return MobileAuthResponse(
@@ -172,9 +173,9 @@ class AuthService:
         if user.blocked:
             raise AppException.forbidden("User is blocked")
 
-        new_access_token = create_acces_mobile_token(session_id)
+        new_access_token = create_access_mobile_token(session_id)
         new_refresh_token = create_refresh_mobile_token(session_id)
-        expiry = Get_expiry_time()
+        expiry = get_expiry_time()
 
         return MobileAuthResponse(
             access_token=new_access_token,
@@ -193,7 +194,7 @@ class AuthService:
         await redis.delete(session_key)
         return {"message": "Logged out successfully"}
 
-    async def add_embbed_user(
+    async def add_embedded_user(
         self,
         user_id: uuid.UUID,
         image_payloads: list[FaceImagePayload],
