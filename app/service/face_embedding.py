@@ -9,6 +9,7 @@ import numpy as np
 from insightface.app import FaceAnalysis  # type: ignore[import-untyped]
 from app.core.config import settings
 from app.core.exceptions import AppException
+from app.core.logger import logger
 
 
 BBox = tuple[int, int, int, int]
@@ -36,6 +37,7 @@ class DetectedFace:
 
 
 class FaceEmbedding:
+    """Thin wrapper around InsightFace to load, initialize, and embed faces."""
     def __init__(
         self,
         model_name: str | None = None,
@@ -69,7 +71,7 @@ class FaceEmbedding:
             name=self.model_name,
             providers=list(self.providers),
         )
-        print("[FaceEmbedding] model loaded!")
+        logger.info("FaceEmbedding model loaded")
 
     def init_model(self) -> None:
         if self.model is None:
@@ -80,7 +82,7 @@ class FaceEmbedding:
 
         self.model.prepare(ctx_id=self.ctx_id, det_size=self.det_size)  # type: ignore
         self._initialized = True
-        print("[FaceEmbedding] model initialized")
+        logger.info("FaceEmbedding model initialized")
 
     def prepare(self) -> None:
         self.load_model()
@@ -126,6 +128,7 @@ class FaceEmbedding:
 
 
 class FaceEmbeddingService:
+    """Service layer for face embedding workflows."""
     def __init__(self, face_embedding: FaceEmbedding | None = None) -> None:
         self.face_embedding = face_embedding or FaceEmbedding()
         self.face_embedding.prepare()
@@ -198,7 +201,11 @@ class FaceEmbeddingService:
                 ]
 
             except Exception as e:
-                print(f"[FaceEmbeddingService] Skipping {payload['filename']}: {e}")
+                logger.warning(
+                    "Skipping %s due to face embedding error: %s",
+                    payload["filename"],
+                    e,
+                )
                 results[payload["filename"]] = []
 
         return results

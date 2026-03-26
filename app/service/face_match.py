@@ -14,6 +14,8 @@ from db.generated import photo_faces as photo_face_queries
 
 
 class SingleFaceMatchService:
+    """Coordinates face-match persistence and user notifications for a single photo."""
+
     def __init__(
         self,
         *,
@@ -45,7 +47,7 @@ class SingleFaceMatchService:
 
         try:
             async with self.conn.begin():
-                if not await self.Check_photo_exists(job.photo_id):
+                if not await self._photo_exists(job.photo_id):
                     logger.warning("Photo not found: %s", job.photo_id)
                     return
 
@@ -89,7 +91,7 @@ class SingleFaceMatchService:
             logger.error("Out of memory while matching photo %s", job.photo_id)
             return
 
-        if created_face_match_id :
+        if created_face_match_id:
             await self.user_notification_service.create_notification(
                 user_id=matched_user.user_id,
                 type="face_match",
@@ -98,7 +100,7 @@ class SingleFaceMatchService:
                 },
             )
 
-    async def Check_photo_exists(self, photo_id: UUID) -> bool:
+    async def _photo_exists(self, photo_id: UUID) -> bool:
         row = await self.photo_face_querier.photo_faces_photo_exists(id=photo_id)
         return row is not None
 

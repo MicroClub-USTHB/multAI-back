@@ -67,28 +67,12 @@ class SingleFaceMatchWorker:
 
         bucket_name, object_name = self._parse_minio_ref(job.image_ref)
         bucket = Bucket(bucket_name, "")
-        last_exc: Exception | None = None
-        for attempt in range(1, settings.MINIO_RETRY_ATTEMPTS + 1):
-            try:
-                data, filename, content_type = await bucket.get(object_name)
-                return FaceImagePayload(
-                    filename=filename,
-                    content_type=content_type,
-                    bytes=data,
-                )
-            except Exception as exc:
-                last_exc = exc
-                logger.warning(
-                    "MinIO fetch failed for %s (attempt %s/%s): %s",
-                    object_name,
-                    attempt,
-                    settings.MINIO_RETRY_ATTEMPTS,
-                    exc,
-                )
-                if attempt < settings.MINIO_RETRY_ATTEMPTS:
-                    await asyncio.sleep(settings.MINIO_RETRY_BASE_SECONDS * attempt)
-        assert last_exc is not None
-        raise last_exc
+        data, filename, content_type = await bucket.get(object_name)
+        return FaceImagePayload(
+            filename=filename,
+            content_type=content_type,
+            bytes=data,
+        )
 
     @staticmethod
     def _parse_minio_ref(image_ref: str) -> tuple[str, str]:
