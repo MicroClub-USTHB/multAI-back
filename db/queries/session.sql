@@ -19,17 +19,35 @@ RETURNING
     created_at;
 
 -- name: GetSessionByDevice :one
-SELECT *
+SELECT
+    id,
+    user_id,
+    device_id,
+    created_at,
+    last_active,
+    expires_at
 FROM user_sessions
 WHERE device_id = $1;
 
 -- name: GetSessionByID :one
-SELECT *
+SELECT
+    id,
+    user_id,
+    device_id,
+    created_at,
+    last_active,
+    expires_at
 FROM user_sessions
 WHERE id = $1;
 
 -- name: ListSessionsByUser :many
-SELECT *
+SELECT
+    id,
+    user_id,
+    device_id,
+    created_at,
+    last_active,
+    expires_at
 FROM user_sessions
 WHERE user_id = $1;
 

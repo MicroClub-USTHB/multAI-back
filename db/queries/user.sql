@@ -1,15 +1,42 @@
 -- name: CreateUser :one
 INSERT INTO users (email, hashed_password)
 VALUES ($1, $2)
-RETURNING *;
+RETURNING
+    id,
+    email,
+    hashed_password,
+    created_at,
+    updated_at,
+    display_name,
+    face_embedding,
+    deleted_at,
+    blocked;
 
 -- name: GetUserByID :one
-SELECT *
+SELECT
+    id,
+    email,
+    hashed_password,
+    created_at,
+    updated_at,
+    display_name,
+    face_embedding,
+    deleted_at,
+    blocked
 FROM users
 WHERE id = $1;
 
 -- name: GetUserByEmail :one
-SELECT *
+SELECT
+    id,
+    email,
+    hashed_password,
+    created_at,
+    updated_at,
+    display_name,
+    face_embedding,
+    deleted_at,
+    blocked
 FROM users
 WHERE email = $1;
 
@@ -18,7 +45,16 @@ UPDATE users
 SET hashed_password = $1,
     updated_at = NOW()
 WHERE id = $2
-RETURNING *;
+RETURNING
+    id,
+    email,
+    hashed_password,
+    created_at,
+    updated_at,
+    display_name,
+    face_embedding,
+    deleted_at,
+    blocked;
 
 -- name: UpdateUser :one
 UPDATE users
@@ -27,21 +63,48 @@ SET email = COALESCE($1, email),
     blocked = COALESCE($3, blocked),
     updated_at = NOW()
 WHERE id = $4
-RETURNING *;
+RETURNING
+    id,
+    email,
+    hashed_password,
+    created_at,
+    updated_at,
+    display_name,
+    face_embedding,
+    deleted_at,
+    blocked;
 
 -- name: SetUserBlocked :one
 UPDATE users
 SET blocked = $1,
     updated_at = NOW()
 WHERE id = $2
-RETURNING *;
+RETURNING
+    id,
+    email,
+    hashed_password,
+    created_at,
+    updated_at,
+    display_name,
+    face_embedding,
+    deleted_at,
+    blocked;
 
 -- name: DeleteUser :exec
 DELETE FROM users
 WHERE id = $1;
 
 -- name: ListUsers :many
-SELECT *
+SELECT
+    id,
+    email,
+    hashed_password,
+    created_at,
+    updated_at,
+    display_name,
+    face_embedding,
+    deleted_at,
+    blocked
 FROM users
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
@@ -51,7 +114,16 @@ UPDATE users
 SET face_embedding = $1::vector,
     updated_at = NOW()
 WHERE id = $2
-RETURNING *;
+RETURNING
+    id,
+    email,
+    hashed_password,
+    created_at,
+    updated_at,
+    display_name,
+    face_embedding,
+    deleted_at,
+    blocked;
 
 -- name: FindClosestUserByEmbedding :one
 SELECT id,

@@ -10,7 +10,13 @@ INSERT INTO photo_faces (
 ON CONFLICT (photo_id, face_index)
 DO UPDATE SET embedding = EXCLUDED.embedding,
               bbox = EXCLUDED.bbox
-RETURNING *;
+RETURNING
+    id,
+    photo_id,
+    face_index,
+    embedding,
+    bbox,
+    created_at;
 
 -- name: PhotoFacesPhotoExists :one
 SELECT 1
@@ -40,6 +46,7 @@ ORDER BY distance ASC
 LIMIT 1;
 
 -- name: PhotoFacesEnsureFaceMatch :one
+-- Ensures one face match per photo by inserting a face_match only if none exist.
 WITH upserted_photo_face AS (
     INSERT INTO photo_faces (
         photo_id,

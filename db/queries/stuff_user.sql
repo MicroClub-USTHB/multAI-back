@@ -1,25 +1,55 @@
 -- name: CreateAdmin :one
 INSERT INTO staff_users (email, password, role)
 VALUES ($1, $2, 'admin')
-RETURNING *;
+RETURNING
+    id,
+    email,
+    role,
+    created_at,
+    updated_at,
+    password;
 
 -- name: CreateMulti :one
 INSERT INTO staff_users (email, password, role)
 VALUES ($1, $2, $3)
-RETURNING *;
+RETURNING
+    id,
+    email,
+    role,
+    created_at,
+    updated_at,
+    password;
 
 -- name: GetStaffUserByID :one
-SELECT *
+SELECT
+    id,
+    email,
+    role,
+    created_at,
+    updated_at,
+    password
 FROM staff_users
 WHERE id = $1;
 
 -- name: GetStaffUserByEmail :one
-SELECT *
+SELECT
+    id,
+    email,
+    role,
+    created_at,
+    updated_at,
+    password
 FROM staff_users
 WHERE email = $1;
 
 -- name: ListStaffUsers :many
-SELECT *
+SELECT
+    id,
+    email,
+    role,
+    created_at,
+    updated_at,
+    password
 FROM staff_users
 WHERE (COALESCE($1, '') = '' OR email ILIKE '%' || $1 || '%')
   AND (COALESCE($2, '') = '' OR role::text = $2)
@@ -35,9 +65,21 @@ LIMIT $5 OFFSET $6;
 UPDATE staff_users
 SET email = $2,  role = $3, updated_at = NOW()
 WHERE id = $1
-RETURNING *;
+RETURNING
+    id,
+    email,
+    role,
+    created_at,
+    updated_at,
+    password;
 
 -- name: DeleteStaffUser :one
 DELETE FROM staff_users
 WHERE id = $1
-RETURNING *;
+RETURNING
+    id,
+    email,
+    role,
+    created_at,
+    updated_at,
+    password;

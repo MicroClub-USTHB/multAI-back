@@ -8,10 +8,32 @@ INSERT INTO user_devices (
 ) VALUES (
     COALESCE($1, uuid_generate_v4()), $2, $3, $4, $5
 )
-RETURNING *;
+RETURNING
+    id,
+    user_id,
+    device_name,
+    device_type,
+    totp_secret,
+    is_2fa_enabled,
+    last_active,
+    created_at,
+    push_token,
+    is_active,
+    is_invalid_token;
 
 -- name: ListUserDevices :many
-SELECT *
+SELECT
+    id,
+    user_id,
+    device_name,
+    device_type,
+    totp_secret,
+    is_2fa_enabled,
+    last_active,
+    created_at,
+    push_token,
+    is_active,
+    is_invalid_token
 FROM user_devices
 WHERE user_id = $1
 ORDER BY last_active DESC;
@@ -35,7 +57,19 @@ AND user_id = $2
 AND is_2fa_enabled = FALSE;
 
 -- name: Get_device_By_id :one
-SELECT * from user_devices
+SELECT
+    id,
+    user_id,
+    device_name,
+    device_type,
+    totp_secret,
+    is_2fa_enabled,
+    last_active,
+    created_at,
+    push_token,
+    is_active,
+    is_invalid_token
+from user_devices
 WHERE id =$1;
 
 -- name: Count_User_Devices :one
@@ -51,7 +85,18 @@ SET
     is_invalid_token = FALSE
 WHERE id = $1
 AND user_id = $3
-RETURNING *;
+RETURNING
+    id,
+    user_id,
+    device_name,
+    device_type,
+    totp_secret,
+    is_2fa_enabled,
+    last_active,
+    created_at,
+    push_token,
+    is_active,
+    is_invalid_token;
 
 -- name: ActivateDevice :exec
 UPDATE user_devices

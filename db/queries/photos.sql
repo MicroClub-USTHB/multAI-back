@@ -8,4 +8,13 @@ INSERT INTO photos (
 ) VALUES (
     $1, $2, $3, $4, $5
 )
-RETURNING *;
+RETURNING
+    id,
+    event_id,
+    uploaded_by,
+    storage_key,
+    taken_at,
+    day_number,
+    visibility,
+    status,
+    created_at;

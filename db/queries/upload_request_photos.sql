@@ -13,22 +13,74 @@ INSERT INTO upload_request_photos (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
-RETURNING *;
+RETURNING
+    id,
+    upload_request_id,
+    drive_file_id,
+    file_name,
+    mime_type,
+    size_bytes,
+    staging_storage_key,
+    final_storage_key,
+    taken_at,
+    day_number,
+    visibility,
+    status,
+    created_at;
 
 -- name: ListUploadRequestPhotosByUploadRequestID :many
-SELECT *
+SELECT
+    id,
+    upload_request_id,
+    drive_file_id,
+    file_name,
+    mime_type,
+    size_bytes,
+    staging_storage_key,
+    final_storage_key,
+    taken_at,
+    day_number,
+    visibility,
+    status,
+    created_at
 FROM upload_request_photos
 WHERE upload_request_id = $1
 ORDER BY created_at ASC;
 
 -- name: ListUploadRequestPhotosByUploadRequestIDs :many
-SELECT *
+SELECT
+    id,
+    upload_request_id,
+    drive_file_id,
+    file_name,
+    mime_type,
+    size_bytes,
+    staging_storage_key,
+    final_storage_key,
+    taken_at,
+    day_number,
+    visibility,
+    status,
+    created_at
 FROM upload_request_photos
 WHERE upload_request_id = ANY($1::uuid[])
 ORDER BY created_at ASC;
 
 -- name: GetUploadRequestPhotoByID :one
-SELECT *
+SELECT
+    id,
+    upload_request_id,
+    drive_file_id,
+    file_name,
+    mime_type,
+    size_bytes,
+    staging_storage_key,
+    final_storage_key,
+    taken_at,
+    day_number,
+    visibility,
+    status,
+    created_at
 FROM upload_request_photos
 WHERE id = $1;
 
@@ -37,13 +89,39 @@ UPDATE upload_request_photos
 SET status = $2,
     final_storage_key = $3
 WHERE id = $1
-RETURNING *;
+RETURNING
+    id,
+    upload_request_id,
+    drive_file_id,
+    file_name,
+    mime_type,
+    size_bytes,
+    staging_storage_key,
+    final_storage_key,
+    taken_at,
+    day_number,
+    visibility,
+    status,
+    created_at;
 
 -- name: UpdateUploadRequestPhotoStatusByUploadRequestID :many
 UPDATE upload_request_photos
 SET status = $2
 WHERE upload_request_id = $1
-RETURNING *;
+RETURNING
+    id,
+    upload_request_id,
+    drive_file_id,
+    file_name,
+    mime_type,
+    size_bytes,
+    staging_storage_key,
+    final_storage_key,
+    taken_at,
+    day_number,
+    visibility,
+    status,
+    created_at;
 
 -- name: DeleteUploadRequestPhotosByUploadRequestID :exec
 DELETE FROM upload_request_photos

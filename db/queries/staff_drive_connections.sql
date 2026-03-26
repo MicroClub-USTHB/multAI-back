@@ -25,10 +25,36 @@ DO UPDATE SET
     connected_at = NOW(),
     revoked_at = NULL,
     updated_at = NOW()
-RETURNING *;
+RETURNING
+    id,
+    staff_user_id,
+    provider,
+    google_email,
+    google_account_id,
+    access_token,
+    refresh_token,
+    token_expires_at,
+    scopes,
+    connected_at,
+    revoked_at,
+    created_at,
+    updated_at;
 
 -- name: GetActiveStaffDriveConnectionByStaffUserID :one
-SELECT *
+SELECT
+    id,
+    staff_user_id,
+    provider,
+    google_email,
+    google_account_id,
+    access_token,
+    refresh_token,
+    token_expires_at,
+    scopes,
+    connected_at,
+    revoked_at,
+    created_at,
+    updated_at
 FROM staff_drive_connections
 WHERE staff_user_id = $1
   AND provider = $2

@@ -2,7 +2,11 @@
 -- Records when a user scans a QR code to join an event
 INSERT INTO event_participants (event_id, user_id)
 VALUES ($1, $2)
-RETURNING *;
+RETURNING
+    id,
+    event_id,
+    user_id,
+    joined_at;
 
 -- name: GetUserEvents :many
 -- Retrieves all events a specific user has successfully joined

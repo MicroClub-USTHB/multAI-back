@@ -6,10 +6,22 @@ INSERT INTO staff_notifications (
 ) VALUES (
     $1, $2, $3
 )
-RETURNING *;
+RETURNING
+    id,
+    staff_user_id,
+    type,
+    payload,
+    read_at,
+    created_at;
 
 -- name: ListStaffNotificationsByStaffUserID :many
-SELECT *
+SELECT
+    id,
+    staff_user_id,
+    type,
+    payload,
+    read_at,
+    created_at
 FROM staff_notifications
 WHERE staff_user_id = $1
 ORDER BY created_at DESC;
@@ -20,4 +32,10 @@ SET read_at = NOW()
 WHERE id = $1
   AND staff_user_id = $2
   AND read_at IS NULL
-RETURNING *;
+RETURNING
+    id,
+    staff_user_id,
+    type,
+    payload,
+    read_at,
+    created_at;
