@@ -12,9 +12,6 @@ from app.core.exceptions import AppException
 from app.core.logger import logger
 
 
-BBox = tuple[int, int, int, int]
-
-
 class FaceImagePayload(TypedDict):
     filename: str
     content_type: str
@@ -88,44 +85,6 @@ class FaceEmbedding:
         self.load_model()
         self.init_model()
 
-    def embed(self, image: np.ndarray, bboxes: Sequence[BBox]) -> list[float]:
-        if not bboxes:
-            raise ValueError("No faces to embed")
-
-        if self.model is None or not self._initialized:
-            raise RuntimeError("Model not ready. Call `prepare()` first.")
-
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        faces: list[FaceStub] = self.model.get(image_rgb)  # type: ignore
-
-        if not faces:
-            raise ValueError("No faces detected by the model")
-
-        x1, y1, x2, y2 = bboxes[0] # type: ignore
-        target_cx = (x1 + x2) / 2
-        target_cy = (y1 + y2) / 2
-
-        best_face: Optional[FaceStub] = None
-        best_dist = float("inf")
-
-        for face in faces:
-            fx1, fy1, fx2, fy2 = face.bbox
-            cx = (fx1 + fx2) / 2
-            cy = (fy1 + fy2) / 2
-
-            dist = np.sqrt((cx - target_cx) ** 2 + (cy - target_cy) ** 2)
-
-            if dist < best_dist:
-                best_dist = dist
-                best_face = face
-
-        if best_face is None or best_face.embedding is None:
-            raise ValueError("Failed to generate embedding for selected face")
-
-        embedding = best_face.embedding.flatten()
-        return embedding.tolist()
-
 
 class FaceEmbeddingService:
     """Service layer for face embedding workflows."""
@@ -172,43 +131,6 @@ class FaceEmbeddingService:
         averaged = np.mean(stacked, axis=0)
 
         return averaged.astype(float).tolist()
-
-    async def compute_event_embedding(
-        self,
-        payloads: Sequence[FaceImagePayload],
-    ) -> dict[str, list[list[float]]]:
-
-        if not payloads:
-            raise AppException.bad_request(
-                "At least one image is required"
-            )
-
-        results: dict[str, list[list[float]]] = {}
-
-        for payload in payloads:
-            try:
-                image = self._decode_image(payload)
-                image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-                faces: list[FaceStub] = await asyncio.to_thread( # type: ignore
-                    self.face_embedding.model.get, image_rgb  # type: ignore
-                )
-
-                results[payload["filename"]] = [
-                    face.embedding.flatten().tolist()
-                    for face in faces
-                    if face.embedding is not None
-                ]
-
-            except Exception as e:
-                logger.warning(
-                    "Skipping %s due to face embedding error: %s",
-                    payload["filename"],
-                    e,
-                )
-                results[payload["filename"]] = []
-
-        return results
 
     async def detect_faces(
         self,

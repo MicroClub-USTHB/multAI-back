@@ -28,7 +28,25 @@ class SingleFaceMatchWorker:
             return
 
         try:
-            payload = await self._load_payload(job)
+            if not job.image_ref:
+                raise ValueError("Missing image_ref in event payload")
+
+            if job.image_ref.startswith(MINIO_URL_PREFIX):
+                raw = job.image_ref[len(MINIO_URL_PREFIX) :]
+                parts = raw.split("/", 1)
+                if len(parts) != 2 or not parts[0] or not parts[1]:
+                    raise ValueError("Invalid MinIO image_ref format")
+                bucket_name, object_name = parts[0], parts[1]
+            else:
+                bucket_name, object_name = IMAGES_BUCKET_NAME, job.image_ref
+
+            bucket = Bucket(bucket_name, "")
+            data, filename, content_type = await bucket.get(object_name)
+            payload = FaceImagePayload(
+                filename=filename,
+                content_type=content_type,
+                bytes=data,
+            )
         except Exception as exc:
             logger.warning("Failed to load image payload for photo %s: %s", job.photo_id, exc)
             return
@@ -60,30 +78,6 @@ class SingleFaceMatchWorker:
         except Exception as exc:
             logger.exception("Failed to process single face match job: %s", exc)
             return
-
-    async def _load_payload(self, job: SingleFaceMatchJob) -> FaceImagePayload:
-        if not job.image_ref:
-            raise ValueError("Missing image_ref in event payload")
-
-        bucket_name, object_name = self._parse_minio_ref(job.image_ref)
-        bucket = Bucket(bucket_name, "")
-        data, filename, content_type = await bucket.get(object_name)
-        return FaceImagePayload(
-            filename=filename,
-            content_type=content_type,
-            bytes=data,
-        )
-
-    @staticmethod
-    def _parse_minio_ref(image_ref: str) -> tuple[str, str]:
-        if image_ref.startswith(MINIO_URL_PREFIX):
-            raw = image_ref[len(MINIO_URL_PREFIX) :]
-            parts = raw.split("/", 1)
-            if len(parts) != 2 or not parts[0] or not parts[1]:
-                raise ValueError("Invalid MinIO image_ref format")
-            return parts[0], parts[1]
-        return IMAGES_BUCKET_NAME, image_ref
-
 
 async def run_worker() -> None:
     await init_minio_client(
