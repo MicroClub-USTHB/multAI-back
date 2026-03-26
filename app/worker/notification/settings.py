@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Sequence, ClassVar
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from pydantic_settings import BaseSettings
 
 from app.schema.internal.notification import NotificationPriority, PRIORITY_ORDER
@@ -19,16 +19,15 @@ class NotificationWorkerSettings(BaseSettings):
     nats_user: str = Field("")
     nats_password: str = Field("")
     firebase_credentials_path: str | None = Field(None)
-    MAX_SEND_ATTEMPTS = 5
-    BASE_RETRY_DELAY = 2
-    MAX_RETRY_DELAY_SECONDS = 60
-    TTL_SECONDS = 30 * 24 * 3600
-    CONCURRENCY = 10
-    RATE_LIMIT = 50
-    RATE_PERIOD = 1.0
+    MAX_SEND_ATTEMPTS: ClassVar[int] = 5
+    BASE_RETRY_DELAY: ClassVar[int] = 2
+    MAX_RETRY_DELAY_SECONDS: ClassVar[int] = 60
+    TTL_SECONDS: ClassVar[int] = 30 * 24 * 3600
+    CONCURRENCY: ClassVar[int] = 10
+    RATE_LIMIT: ClassVar[int] = 50
+    RATE_PERIOD: ClassVar[float] = 1.0
 
-    class Config:
-        env_prefix = "NOTIFICATIONS_"
+    model_config = ConfigDict(env_prefix="NOTIFICATIONS_")
 
     def subject_for(self, priority: NotificationPriority) -> str:
         return f"{self.subject_prefix}.{priority.value}"

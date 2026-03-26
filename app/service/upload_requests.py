@@ -198,29 +198,6 @@ class UploadRequestsService:
 
         return created_photo
 
-    def _ensure_request_access(
-        self,
-        *,
-        current_staff_user: StaffUser,
-        upload_request: UploadRequest,
-    ) -> None:
-        if upload_request.requested_by == current_staff_user.id:
-            return
-        if self._role_value(current_staff_user.role) == StaffRole.MULTI_TEAM_LEAD.value:
-            return
-        raise AppException.forbidden("You are not allowed to access this upload request")
-
-    async def _publish_event(
-        self,
-        *,
-        subject: NatsSubjects,
-        payload: dict[str, object],
-    ) -> None:
-        try:
-            await NatsClient.publish(subject, json.dumps(payload).encode("utf-8"))
-        except Exception as exc:
-            logger.warning("Failed to publish upload request event %s: %s", subject.value, exc)
-
     async def get_request_details(
         self,
         *,
@@ -497,3 +474,26 @@ class UploadRequestsService:
         )
         await self._delete_staging_objects_best_effort(staged_photos)
         return UploadRequestDetails(request=upload_request, photos=rejected_photos)
+
+    def _ensure_request_access(
+        self,
+        *,
+        current_staff_user: StaffUser,
+        upload_request: UploadRequest,
+    ) -> None:
+        if upload_request.requested_by == current_staff_user.id:
+            return
+        if self._role_value(current_staff_user.role) == StaffRole.MULTI_TEAM_LEAD.value:
+            return
+        raise AppException.forbidden("You are not allowed to access this upload request")
+
+    async def _publish_event(
+        self,
+        *,
+        subject: NatsSubjects,
+        payload: dict[str, object],
+    ) -> None:
+        try:
+            await NatsClient.publish(subject, json.dumps(payload).encode("utf-8"))
+        except Exception as exc:
+            logger.warning("Failed to publish upload request event %s: %s", subject.value, exc)

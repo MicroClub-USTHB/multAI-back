@@ -1,6 +1,4 @@
-"""Audit worker package exports."""
+"""Audit worker package."""
 from __future__ import annotations
 
-from .main import main  # noqa: F401
-
-__all__ = ["main"]
+__all__: list[str] = []

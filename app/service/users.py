@@ -19,7 +19,7 @@ from app.schema.response.mobile.auth import MobileAuthResponse
 from db.generated import user as user_queries
 from db.generated import devices as device_queries
 from db.generated import session as session_queries
-from db.generated.models import User, UserDevice
+from db.generated.models import User
 from app.core.logger import logger
 from app.service.face_embedding import FaceImagePayload, FaceEmbeddingService
 from app.schema.internal.single_face_match import ClosestUserMatch
@@ -49,7 +49,7 @@ class AuthService:
         self,
         user_id: uuid.UUID,
         req: MobileAuthRequest,
-    ) -> UserDevice:
+    ) -> None:
         existing_device = await self.device_querier.get_device__by_id(id=req.device_id)
 
         if existing_device:
@@ -61,7 +61,7 @@ class AuthService:
                 )
             if not existing_device.is_active:
                 await self.device_querier.activate_device(id=req.device_id, user_id=user_id)
-            return existing_device
+            return
 
         device = await self.device_querier.create_device(
             arg=device_queries.CreateDeviceParams(
@@ -74,7 +74,6 @@ class AuthService:
         )
         if not device:
             raise AppException.internal_error("Failed to create device")
-        return device
 
     async def mobile_register_login(
         self,

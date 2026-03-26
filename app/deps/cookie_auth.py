@@ -7,12 +7,8 @@ from app.core.exceptions import AppException
 from db.generated.models import StaffRole, StaffUser
 from app.core.securite import decode_staff_token
 
-
-
 def _role_value(role: object) -> str:
     return getattr(role, "value", str(role))
-
-
 
 async def get_current_staff_user(
     container: Annotated[Container, Depends(get_container)],

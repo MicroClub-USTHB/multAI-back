@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 import jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import pyotp
 from app.core.config import settings
 from app.core.exceptions import AppException
@@ -119,9 +119,7 @@ class StaffJWTPayload(BaseModel):
     type: Literal["access", "refresh"]
     exp: int
 
-    class Config:
-        frozen = True
-        # immutable class
+    model_config = ConfigDict(frozen=True)
 
 
 def create_access_staff_token(staff_id: str, role: str) -> str:
