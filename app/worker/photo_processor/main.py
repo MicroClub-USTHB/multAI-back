@@ -14,7 +14,6 @@ from app.worker.photo_processor.schema.event import PhotoGroupProcessEvent
 from db.generated import user as user_queries
 from db.generated import photo_faces as photo_face_queries
 from db.generated import photo_approvals as photo_approval_queries
-from db.generated.photo_faces import CreatePhotoFaceParams
 from db.generated.photo_approvals import CreatePhotoApprovalParams
 
 SIMILARITY_THRESHOLD = 0.5
@@ -76,13 +75,11 @@ class PhotoGroupProcessWorker:
         for face_index, face_embedding in enumerate(face_embeddings):
 
             # create PhotoFace record
-            photo_face = await face_querier.create_photo_face(
-                CreatePhotoFaceParams(
-                    photo_id=event.photo_id,
-                    face_index=face_index,
-                    embedding=face_embedding,
-                    bbox="",
-                )
+            photo_face = await face_querier.upsert_photo_face(
+              photo_id=event.photo_id,
+              face_index=face_index,
+              dollar_3=face_embedding,
+              bbox=None,
             )
 
             if photo_face is None:
