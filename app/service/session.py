@@ -6,6 +6,7 @@ from db.generated.models import UserSession
 from datetime import datetime,timedelta,timezone
 from app.infra.redis import RedisClient
 from app.core.constant import RedisKey
+from app.core.config import settings
 from db.generated.session import UpsertSessionRow
 
 class SessionRedis(BaseModel):
@@ -31,7 +32,8 @@ class SessionService :
             session = await SessionService.session_querier.upsert_session(
                 user_id=user_id,
                 device_id=device_id,
-                expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+                expires_at=datetime.now(timezone.utc)
+                + timedelta(days=settings.MOBILE_SESSION_DAYS),
             )
             if session is None :
                 raise AppException.internal_error("session creation failed ")
@@ -45,7 +47,7 @@ class SessionService :
                     last_active=session.last_active,
                     expires_at=session.expires_at,
                 ).model_dump_json(),
-                expire=60*60*5,
+                expire=settings.SESSION_REDIS_TTL_SECONDS,
                 nx=True
             )
             if not result:
@@ -96,7 +98,7 @@ class SessionService :
                         last_active=session_info.last_active,
                         expires_at=session_info.expires_at,
                     ).model_dump_json(),
-                    expire=60 * 60 * 5,
+                    expire=settings.SESSION_REDIS_TTL_SECONDS,
                     nx=False,
                 )
 
@@ -116,7 +118,7 @@ class SessionService :
                     last_active=session.last_active,
                     expires_at=session.expires_at,
                 ).model_dump_json(),
-                expire=60 * 60 * 5,
+                expire=settings.SESSION_REDIS_TTL_SECONDS,
                 nx=True,
             )
 

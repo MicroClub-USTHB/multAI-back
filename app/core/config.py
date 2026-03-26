@@ -4,8 +4,10 @@ from pydantic import field_validator
 
 class Settings(BaseSettings):
     app_name: str = "multAI"
+    API_VERSION: str = "1.0.0"
     environment: str = "dev"
     debug: bool = True
+    CORS_ALLOW_ORIGINS: list[str] = ["*"]
 
     # Redis
     REDIS_PORT: int
@@ -28,6 +30,9 @@ class Settings(BaseSettings):
     MINIO_HOST: str
     MINIO_RETRY_ATTEMPTS: int = 3
     MINIO_RETRY_BASE_SECONDS: float = 0.5
+    MINIO_INIT_MAX_RETRIES: int = 5
+    MINIO_INIT_RETRY_BASE_SECONDS: float = 2.0
+    MINIO_PART_SIZE_BYTES: int = 10 * 1024 * 1024
 
     # PostgreSQL
     POSTGRES_USER: str
@@ -40,6 +45,7 @@ class Settings(BaseSettings):
     MOBILE_SESSION_LIMIT: int = 3
     MOBILE_SESSION_TTL_SECONDS: int = 180
     MOBILE_SESSION_DAYS: int = 7
+    SESSION_REDIS_TTL_SECONDS: int = 60 * 60 * 5
     # Admin list defaults
     ADMIN_USERS_DEFAULT_LIMIT: int = 20
     ADMIN_USERS_MAX_LIMIT: int = 100
@@ -48,6 +54,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     encryption_key: str
     totp_issuer: str = "multAI"
+    ACCESS_TOKEN_EXPIRY_DEV_SECONDS: int = 60 * 60 * 24 * 7
+    ACCESS_TOKEN_EXPIRY_PROD_SECONDS: int = 60 * 60 * 24
+    STAFF_AUTH_COOKIE_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 7
 
     # Face embedding model
     FACE_EMBEDDING_MODEL_NAME: str = "buffalo_l"
@@ -82,7 +91,14 @@ class Settings(BaseSettings):
             if lowered in {"true", "1", "yes"}:
                 return True
             return value
-        
+
+    @field_validator("CORS_ALLOW_ORIGINS", mode="before")
+    @classmethod
+    def _parse_cors_allow_origins(cls, value):  # type: ignore[no-untyped-def]
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
 
 
 settings = Settings()  # type: ignore

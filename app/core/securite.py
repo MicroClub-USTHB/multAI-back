@@ -32,9 +32,9 @@ def verify_password(password: str, hashed: str) -> bool:
 
 def get_expiry_time() -> int:
     if settings.environment == "dev":
-        expiry = 60 * 60 * 24 * 7
+        expiry = settings.ACCESS_TOKEN_EXPIRY_DEV_SECONDS
     else:
-        expiry = 60 * 60 * 24
+        expiry = settings.ACCESS_TOKEN_EXPIRY_PROD_SECONDS
     return expiry
 
 

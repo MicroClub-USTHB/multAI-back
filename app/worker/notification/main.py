@@ -74,7 +74,10 @@ async def retry(
         if not notification.tokens:
             return
 
-    delay = min(NotifSetting.BASE_RETRY_DELAY * (2 ** attempts), 60)
+    delay = min(
+        NotifSetting.BASE_RETRY_DELAY * (2 ** attempts),
+        NotifSetting.MAX_RETRY_DELAY_SECONDS,
+    )
 
     await asyncio.sleep(delay)
     await queue.enqueue_notification(notification, attempts=attempts)

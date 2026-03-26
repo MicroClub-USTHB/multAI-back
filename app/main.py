@@ -46,12 +46,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 
-MAX_RETRIES = 5
-RETRY_DELAY = 2  # seconds
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
-    for attempt in range(1, MAX_RETRIES + 1):
+    for attempt in range(1, settings.MINIO_INIT_MAX_RETRIES + 1):
         try:
             await init_minio_client(
                 minio_host=settings.MINIO_HOST,
@@ -61,10 +59,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
             break
         except Exception as e:
-            print(f"[MINIO] Attempt {attempt} failed: {e}")
-            if attempt == MAX_RETRIES:
+            logger.warning(
+                "MinIO init attempt %s/%s failed: %s",
+                attempt,
+                settings.MINIO_INIT_MAX_RETRIES,
+                e,
+            )
+            if attempt == settings.MINIO_INIT_MAX_RETRIES:
                 raise RuntimeError("Cannot connect to MinIO after multiple attempts") from e
-            await asyncio.sleep(RETRY_DELAY)
+            await asyncio.sleep(settings.MINIO_INIT_RETRY_BASE_SECONDS * attempt)
 
     RedisClient(
         host=settings.REDIS_HOST,
@@ -85,7 +88,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="multAI API",
     description="Mobile and Web API for multAI",
-    version="1.0.0",
+    version=settings.API_VERSION,
     lifespan=lifespan,
 )
 
@@ -93,7 +96,7 @@ app.add_middleware(RequestLoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

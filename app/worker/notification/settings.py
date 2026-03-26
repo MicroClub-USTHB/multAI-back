@@ -21,6 +21,7 @@ class NotificationWorkerSettings(BaseSettings):
     firebase_credentials_path: str | None = Field(None)
     MAX_SEND_ATTEMPTS = 5
     BASE_RETRY_DELAY = 2
+    MAX_RETRY_DELAY_SECONDS = 60
     TTL_SECONDS = 30 * 24 * 3600
     CONCURRENCY = 10
     RATE_LIMIT = 50
