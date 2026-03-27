@@ -101,8 +101,9 @@ class PhotoGroupProcessWorker:
                     # 6. create PhotoApproval
                     await approval_querier.create_photo_approval(
                         CreatePhotoApprovalParams(
-                            photo_id=event.photo_id,
+                            photo_face_id=photo_face.id,
                             user_id=user.id,
+                            decision=None,
                         )
                     )
 
