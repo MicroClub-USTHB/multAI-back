@@ -102,7 +102,7 @@ class PhotoGroupProcessWorker:
                     await approval_querier.create_photo_approval(
                             photo_id=event.photo_id,
                             user_id=user.id,
-                            decision=None,
+                            decision="pending",
                     )
 
 

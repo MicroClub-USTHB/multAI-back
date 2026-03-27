@@ -92,7 +92,7 @@ async def test_no_approval_for_unmatched_user(worker: PhotoGroupProcessWorker, e
     worker._bucket.get = AsyncMock(return_value=(b"imagedata", "test.jpg", "image/jpeg")) # type: ignore
     worker._face_service.compute_event_embedding = AsyncMock( # type: ignore
         return_value={"test.jpg": [face_embedding]}
-    ) # type: ignore    
+    ) # type: ignore
 
     mock_user = MagicMock()
     mock_user.id = uuid.uuid4()
