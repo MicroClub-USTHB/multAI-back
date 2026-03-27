@@ -55,7 +55,8 @@ get_db:
 	psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -h localhost -p $(POSTGRES_PORT)
 
 run-app:
-	uv run fastapi dev app/main.py 
+	uv run uvicorn app.main:app --reload
+ 
 
 lint:
 	uv run ruff check .
