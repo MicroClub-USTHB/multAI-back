@@ -1,6 +1,6 @@
 -- name: CreatePhotoApproval :one
 INSERT INTO photo_approvals (
-    photo_id,
+    photo_face_id,
     user_id,
     decision
 ) VALUES (
