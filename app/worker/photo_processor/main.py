@@ -14,7 +14,7 @@ from app.worker.photo_processor.schema.event import PhotoGroupProcessEvent
 from db.generated import user as user_queries
 from db.generated import photo_faces as photo_face_queries
 from db.generated import photo_approvals as photo_approval_queries
-from db.generated.photo_approvals import CreatePhotoApprovalParams
+
 
 SIMILARITY_THRESHOLD = 0.5
 STREAM_NAME = "photos"
@@ -100,11 +100,9 @@ class PhotoGroupProcessWorker:
                     )
                     # 6. create PhotoApproval
                     await approval_querier.create_photo_approval(
-                        CreatePhotoApprovalParams(
-                            photo_face_id=photo_face.id,
+                            photo_id=event.photo_id,
                             user_id=user.id,
                             decision=None,
-                        )
                     )
 
 
