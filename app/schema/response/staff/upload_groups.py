@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.schema.response.staff.uploads import UploadRequestPhotoListResponse, UploadRequestSchema
 from app.service.upload_requests import UploadRequestGroupDetails
@@ -9,6 +9,8 @@ from db.generated.models import UploadRequestPhoto
 
 
 class UploadRequestGroupSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     event_id: UUID
     folder_id: str
@@ -47,6 +49,8 @@ class UploadRequestGroupSchema(BaseModel):
 
 
 class UploadRequestGroupListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     items: list[UploadRequestGroupSchema]
 
     @classmethod

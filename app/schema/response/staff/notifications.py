@@ -2,12 +2,14 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from db.generated.models import StaffNotification
 
 
 class StaffNotificationSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     type: str
     payload: dict[str, Any]
@@ -26,6 +28,8 @@ class StaffNotificationSchema(BaseModel):
 
 
 class StaffNotificationListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     items: list[StaffNotificationSchema]
 
     @classmethod

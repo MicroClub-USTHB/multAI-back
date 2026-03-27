@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from db.generated.models import AuditEvent, User
 from app.core.constant import AuditEventType
@@ -12,6 +12,8 @@ from app.schema.response.mobile.auth import UserSchema
 
 
 class AuditActorSchema(UserSchema):
+    model_config = ConfigDict(from_attributes=True)
+
     display_name: str | None
 
     @classmethod
@@ -24,6 +26,8 @@ class AuditActorSchema(UserSchema):
 
 
 class AuditEventSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     event_type: AuditEventType
     metadata: dict[str, Any] | None
@@ -46,4 +50,6 @@ class AuditEventSchema(BaseModel):
 
 
 class AuditEventListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     items: list[AuditEventSchema]

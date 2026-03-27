@@ -1,12 +1,17 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from db.generated.models import UploadRequest, UploadRequestPhoto
-# TODO:try to minimize this code its good but its too much u can do in simple wy
+
+
 class UploadRequestSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     class UploadRequestPhotoSchema(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
         id: UUID
         drive_file_id: str
         file_name: str
@@ -72,6 +77,8 @@ class UploadRequestSchema(BaseModel):
 
 
 class UploadRequestListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     items: list[UploadRequestSchema]
 
     @classmethod
@@ -88,6 +95,8 @@ class UploadRequestListResponse(BaseModel):
 
 
 class UploadRequestPhotoListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     items: list[UploadRequestSchema.UploadRequestPhotoSchema]
 
     @classmethod
