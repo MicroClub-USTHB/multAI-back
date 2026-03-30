@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Any
 import sqlalchemy.ext.asyncio
-
+from enum import Enum
 from app.core.logger import logger
 from app.infra.database import engine
 from app.infra.nats import NatsClient, NatsSubjects
@@ -17,6 +17,10 @@ from db.generated import photo_faces as photo_face_queries
 STREAM_NAME = "photos"
 DURABLE_NAME = "photo-group-processor"
 
+class PhotoApprovalDecision(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
 class PhotoGroupProcessWorker:
     def __init__(self) -> None:
@@ -66,8 +70,10 @@ class PhotoGroupProcessWorker:
             photo_id=event.photo_id,
             face_index=face_index,
             embedding=face_embedding, 
+            decision=PhotoApprovalDecision.PENDING.value,
             bbox=""
         )
+        
 
 def _parse_payload(raw_data: bytes) -> dict[str, Any] | None:
     try:
