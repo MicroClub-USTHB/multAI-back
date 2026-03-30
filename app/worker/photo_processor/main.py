@@ -1,8 +1,6 @@
 import asyncio
 import json
 from typing import Any
-
-import numpy as np
 import sqlalchemy.ext.asyncio
 
 from app.core.logger import logger
@@ -11,19 +9,14 @@ from app.infra.nats import NatsClient, NatsSubjects
 from app.infra.minio import ImageBucket
 from app.service.face_embedding import FaceEmbeddingService, FaceImagePayload
 from app.worker.photo_processor.schema.event import PhotoGroupProcessEvent
-from db.generated import user as user_queries
 from db.generated import photo_faces as photo_face_queries
-from db.generated import photo_approvals as photo_approval_queries
 
 
-SIMILARITY_THRESHOLD = 0.5
+
+
 STREAM_NAME = "photos"
 DURABLE_NAME = "photo-group-processor"
 
-def cosine_similarity(a: list[float], b: Any) -> float:
-    va = np.array(a, dtype=np.float32)
-    vb = np.array(b, dtype=np.float32)
-    return float(np.dot(va, vb) / (np.linalg.norm(va) * np.linalg.norm(vb)))
 
 class PhotoGroupProcessWorker:
     def __init__(self) -> None:
@@ -65,52 +58,16 @@ class PhotoGroupProcessWorker:
         if not face_embeddings:
             logger.info("No faces detected in photo %s", event.photo_id)
             return
-
-        # 3. fetch all enrolled users
-        user_querier = user_queries.AsyncQuerier(self._conn)
+        
         face_querier = photo_face_queries.AsyncQuerier(self._conn)
-        approval_querier = photo_approval_queries.AsyncQuerier(self._conn)
-
-        # 4. process each detected face
+        
         for face_index, face_embedding in enumerate(face_embeddings):
-
-            #find matching user first  
-            matched_user_id = None
-
-            async for user in user_querier.list_users_with_embedding():
-                if user.face_embedding is None:
-                    continue
-
-                similarity = cosine_similarity(face_embedding, user.face_embedding)
-
-                if similarity >= SIMILARITY_THRESHOLD:
-                    logger.info(
-                        "Face %s matched user %s with similarity %.4f",
-                        face_index, user.id, similarity
-                    )
-                    matched_user_id = user.id
-                    break
-            if matched_user_id is None :
-                logger.info("Face %s did not match any enrolled user", face_index)
-                continue    
-            #photo face record creation with matched user 
-            photo_face = await face_querier.upsert_photo_face(
-             photo_id=event.photo_id,
-             face_index=face_index,
-             user_id=matched_user_id,
-             dollar_3=face_embedding,
-            )
-            if photo_face is None:
-             logger.warning("Failed to create photo face %s for photo %s", face_index, event.photo_id)
-             continue 
-
-        # 7. create PhotoApproval for matched user
-        await approval_querier.create_photo_approval(
+         await face_querier.insert_photo_face_and_approval(
             photo_id=event.photo_id,
-            user_id=matched_user_id,
-            decision="pending",
+            face_index=face_index,
+            embedding=face_embedding, 
+            bbox=""
         )
-
 
 def _parse_payload(raw_data: bytes) -> dict[str, Any] | None:
     try:
