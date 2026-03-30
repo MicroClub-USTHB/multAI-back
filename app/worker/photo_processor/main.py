@@ -99,9 +99,10 @@ class PhotoGroupProcessWorker:
              face_index=face_index,
              user_id=matched_user_id,
              dollar_3=face_embedding,
-         )
-        if photo_face is None:
-           logger.warning("Failed to create photo face %s for photo %s", face_index, event.photo_id)
+            )
+            if photo_face is None:
+             logger.warning("Failed to create photo face %s for photo %s", face_index, event.photo_id)
+             continue 
 
         # 7. create PhotoApproval for matched user
         await approval_querier.create_photo_approval(
