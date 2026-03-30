@@ -73,3 +73,16 @@ SELECT upserted_photo_face.id AS photo_face_id,
        inserted_match.id AS face_match_id
 FROM upserted_photo_face
 LEFT JOIN inserted_match ON TRUE;
+-- name: InsertPhotoFaceWithApproval :one
+WITH matched_user AS (
+    SELECT id AS user_id
+    FROM users
+    WHERE face_embedding IS NOT NULL
+      AND deleted_at IS NULL
+      AND 1 - (embedding <#> $3::vector) <= $4  -- similarity threshold
+    ORDER BY embedding <#> $3::vector ASC
+    LIMIT 1
+)
+INSERT INTO photo_faces (photo_id, face_index, embedding, user_id, bbox)
+VALUES ($1, $2, $3::vector, (SELECT user_id FROM matched_user), $5)
+RETURNING *;
