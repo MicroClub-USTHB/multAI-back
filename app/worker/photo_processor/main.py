@@ -10,7 +10,7 @@ from app.infra.minio import ImageBucket
 from app.service.face_embedding import FaceEmbeddingService, FaceImagePayload
 from app.worker.photo_processor.schema.event import PhotoGroupProcessEvent
 from db.generated import photo_faces as photo_face_queries
-
+from db.generated.photo_faces import InsertPhotoFaceWithApprovalParams
 
 
 
@@ -66,12 +66,15 @@ class PhotoGroupProcessWorker:
         face_querier = photo_face_queries.AsyncQuerier(self._conn)
         
         for face_index, face_embedding in enumerate(face_embeddings):
-         await face_querier.insert_photo_face_and_approval(
+         await face_querier.insert_photo_face_with_approval(
+             InsertPhotoFaceWithApprovalParams(
             photo_id=event.photo_id,
             face_index=face_index,
-            embedding=face_embedding, 
+            column_3=face_embedding,
+            face_embedding=None, 
+            bbox="",
             decision=PhotoApprovalDecision.PENDING.value,
-            bbox=""
+            )
         )
         
 

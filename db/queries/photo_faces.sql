@@ -79,7 +79,7 @@ WITH matched_user AS (
     FROM users
     WHERE face_embedding IS NOT NULL
       AND deleted_at IS NULL
-      AND face_ embedding <#> $3::vector <= $4  
+      AND face_embedding <#> $3::vector <= $4  
     ORDER BY face_embedding <#> $3::vector ASC
     LIMIT 1
 ),
@@ -87,7 +87,7 @@ insert_face AS (
 INSERT INTO photo_faces (photo_id, face_index, embedding, bbox)
 VALUES ($1, $2, $3::vector, $5)
 RETURNING id, photo_id, face_index
-);
+),
 matched AS (
     SELECT insert_face.photo_id, matched_user.user_id
     FROM insert_face, matched_user
