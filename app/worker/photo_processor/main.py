@@ -74,19 +74,9 @@ class PhotoGroupProcessWorker:
         # 4. process each detected face
         for face_index, face_embedding in enumerate(face_embeddings):
 
-            # create PhotoFace record
-            photo_face = await face_querier.upsert_photo_face(
-              photo_id=event.photo_id,
-              face_index=face_index,
-              dollar_3=face_embedding,
-              bbox=None,
-            )
+            #find matching user first  
+            matched_user_id = None
 
-            if photo_face is None:
-                logger.warning("Failed to create photo face %s for photo %s", face_index, event.photo_id)
-                continue
-
-            # 5. compare against all enrolled users
             async for user in user_querier.list_users_with_embedding():
                 if user.face_embedding is None:
                     continue
@@ -98,12 +88,29 @@ class PhotoGroupProcessWorker:
                         "Face %s matched user %s with similarity %.4f",
                         face_index, user.id, similarity
                     )
-                    # 6. create PhotoApproval
-                    await approval_querier.create_photo_approval(
-                            photo_id=event.photo_id,
-                            user_id=user.id,
-                            decision="pending",
-                    )
+                    matched_user_id = user.id
+                    break
+            if matched_user_id is None :
+                logger.info("Face %s did not match any enrolled user", face_index)
+                continue    
+            #photo face record creation with matched user 
+            bbox = str(face_embeddings[face_index])  # store as string representation
+            photo_face = await face_querier.upsert_photo_face(
+            photo_id=event.photo_id,
+            face_index=face_index,
+            user_id=matched_user_id,
+            dollar_3=face_embedding,
+            bbox=bbox,
+         )
+        if photo_face is None:
+           logger.warning("Failed to create photo face %s for photo %s", face_index, event.photo_id)
+
+        # 7. create PhotoApproval for matched user
+        await approval_querier.create_photo_approval(
+            photo_id=event.photo_id,
+            user_id=matched_user_id,
+            decision="pending",
+        )
 
 
 def _parse_payload(raw_data: bytes) -> dict[str, Any] | None:
