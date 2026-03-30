@@ -62,21 +62,21 @@ class PhotoGroupProcessWorker:
         if not face_embeddings:
             logger.info("No faces detected in photo %s", event.photo_id)
             return
-        
+
         face_querier = photo_face_queries.AsyncQuerier(self._conn)
-        
+
         for face_index, face_embedding in enumerate(face_embeddings):
          await face_querier.insert_photo_face_with_approval(
            InsertPhotoFaceWithApprovalParams(
             photo_id=event.photo_id,
             face_index=face_index,
             column_3=face_embedding,
-            face_embedding=SIMILARITY_THRESHOLD, 
+            face_embedding=SIMILARITY_THRESHOLD,
             bbox="",
             decision=PhotoApprovalDecision.PENDING.value,
             )
         )
-        
+
 
 def _parse_payload(raw_data: bytes) -> dict[str, Any] | None:
     try:

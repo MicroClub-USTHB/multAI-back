@@ -1,7 +1,7 @@
 import sys
 import pytest
 import uuid
-from typing import AsyncGenerator, Generator
+from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.modules['db.generated.user'] = MagicMock()
@@ -37,81 +37,49 @@ async def test_no_faces_detected(worker: PhotoGroupProcessWorker, event: PhotoGr
     """If no faces detected, worker should exit early without creating any records."""
     assert worker._bucket is not None
     assert worker._face_service is not None
-    worker._bucket.get = AsyncMock(return_value=(b"imagedata", "test.jpg", "image/jpeg")) # type: ignore
-    worker._face_service.compute_event_embedding = AsyncMock(return_value={"test.jpg": []}) # type: ignore
+    worker._bucket.get = AsyncMock(return_value=(b"imagedata", "test.jpg", "image/jpeg"))  # type: ignore
+    worker._face_service.compute_event_embedding = AsyncMock(return_value={"test.jpg": []})  # type: ignore
 
-    with patch("app.worker.photo_processor.main.photo_face_queries") as mock_face_q, \
-         patch("app.worker.photo_processor.main.photo_approval_queries") as mock_approval_q:
-
+    with patch("app.worker.photo_processor.main.photo_face_queries") as mock_face_q:
         await worker.process(event)
-
-        mock_face_q.AsyncQuerier.return_value.upsert_photo_face.assert_not_called()
-        mock_approval_q.AsyncQuerier.return_value.create_photo_approval.assert_not_called()
+        mock_face_q.AsyncQuerier.return_value.insert_photo_face_with_approval.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_creates_photo_face_and_approval_for_matched_user(worker: PhotoGroupProcessWorker, event: PhotoGroupProcessEvent) -> None:
-    """For each matched user, a PhotoFace and PhotoApproval should be created."""
+    """For each detected face, insert_photo_face_with_approval should be called once."""
     face_embedding = [0.1] * 512
-    user_id = uuid.uuid4()
 
-    worker._bucket.get = AsyncMock(return_value=(b"imagedata", "test.jpg", "image/jpeg")) # type: ignore
-    worker._face_service.compute_event_embedding = AsyncMock( # type: ignore
+    assert worker._bucket is not None
+    assert worker._face_service is not None
+    worker._bucket.get = AsyncMock(return_value=(b"imagedata", "test.jpg", "image/jpeg"))  # type: ignore
+    worker._face_service.compute_event_embedding = AsyncMock(  # type: ignore
         return_value={"test.jpg": [face_embedding]}
-    ) # type: ignore
+    )
 
-    mock_user = MagicMock()
-    mock_user.id = user_id
-    mock_user.face_embedding = [0.1] * 512
-
-    mock_photo_face = MagicMock()
-    mock_photo_face.id = uuid.uuid4()
-
-    with patch("app.worker.photo_processor.main.user_queries") as mock_user_q, \
-         patch("app.worker.photo_processor.main.photo_face_queries") as mock_face_q, \
-         patch("app.worker.photo_processor.main.photo_approval_queries") as mock_approval_q:
-
-        async def mock_list_users_with_embedding() -> AsyncGenerator[MagicMock, None]:
-            yield mock_user
-
-        mock_user_q.AsyncQuerier.return_value.list_users_with_embedding = mock_list_users_with_embedding
-        mock_face_q.AsyncQuerier.return_value.upsert_photo_face = AsyncMock(return_value=mock_photo_face)
-        mock_approval_q.AsyncQuerier.return_value.create_photo_approval = AsyncMock()
+    with patch("app.worker.photo_processor.main.photo_face_queries") as mock_face_q:
+        mock_face_q.AsyncQuerier.return_value.insert_photo_face_with_approval = AsyncMock(return_value=MagicMock())
 
         await worker.process(event)
 
-        mock_face_q.AsyncQuerier.return_value.upsert_photo_face.assert_called_once()
-        mock_approval_q.AsyncQuerier.return_value.create_photo_approval.assert_called_once()
+        mock_face_q.AsyncQuerier.return_value.insert_photo_face_with_approval.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_no_approval_for_unmatched_user(worker: PhotoGroupProcessWorker, event: PhotoGroupProcessEvent) -> None:
-    """If similarity is below threshold, no PhotoApproval should be created."""
-    face_embedding = [0.1] * 512
+async def test_multiple_faces_calls_insert_for_each(worker: PhotoGroupProcessWorker, event: PhotoGroupProcessEvent) -> None:
+    """For each detected face, insert_photo_face_with_approval should be called once per face."""
+    face_embeddings = [[0.1] * 512, [0.2] * 512, [0.3] * 512]
 
-    worker._bucket.get = AsyncMock(return_value=(b"imagedata", "test.jpg", "image/jpeg")) # type: ignore
-    worker._face_service.compute_event_embedding = AsyncMock( # type: ignore
-        return_value={"test.jpg": [face_embedding]}
-    ) # type: ignore
+    assert worker._bucket is not None
+    assert worker._face_service is not None
+    worker._bucket.get = AsyncMock(return_value=(b"imagedata", "test.jpg", "image/jpeg"))  # type: ignore
+    worker._face_service.compute_event_embedding = AsyncMock(  # type: ignore
+        return_value={"test.jpg": face_embeddings}
+    )
 
-    mock_user = MagicMock()
-    mock_user.id = uuid.uuid4()
-    mock_user.face_embedding = [-0.1] * 512
-
-    mock_photo_face = MagicMock()
-    mock_photo_face.id = uuid.uuid4()
-
-    with patch("app.worker.photo_processor.main.user_queries") as mock_user_q, \
-         patch("app.worker.photo_processor.main.photo_face_queries") as mock_face_q, \
-         patch("app.worker.photo_processor.main.photo_approval_queries") as mock_approval_q:
-
-        async def mock_list_users_with_embedding() -> AsyncGenerator[MagicMock, None]:
-            yield mock_user
-
-        mock_user_q.AsyncQuerier.return_value.list_users_with_embedding = mock_list_users_with_embedding
-        mock_face_q.AsyncQuerier.return_value.upsert_photo_face = AsyncMock(return_value=mock_photo_face)
-        mock_approval_q.AsyncQuerier.return_value.create_photo_approval = AsyncMock()
+    with patch("app.worker.photo_processor.main.photo_face_queries") as mock_face_q:
+        mock_face_q.AsyncQuerier.return_value.insert_photo_face_with_approval = AsyncMock(return_value=MagicMock())
 
         await worker.process(event)
 
-        mock_approval_q.AsyncQuerier.return_value.create_photo_approval.assert_not_called()
+        assert mock_face_q.AsyncQuerier.return_value.insert_photo_face_with_approval.call_count == 3
