@@ -79,7 +79,7 @@ WITH matched_user AS (
     FROM users
     WHERE face_embedding IS NOT NULL
       AND deleted_at IS NULL
-      AND 1 - (embedding <#> $3::vector) <= $4  -- similarity threshold
+      AND embedding <#> $3::vector <= $4  
     ORDER BY embedding <#> $3::vector ASC
     LIMIT 1
 )
