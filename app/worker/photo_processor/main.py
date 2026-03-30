@@ -13,7 +13,7 @@ from db.generated import photo_faces as photo_face_queries
 from db.generated.photo_faces import InsertPhotoFaceWithApprovalParams
 
 
-
+SIMILARITY_THRESHOLD = 0.5
 STREAM_NAME = "photos"
 DURABLE_NAME = "photo-group-processor"
 
@@ -67,11 +67,11 @@ class PhotoGroupProcessWorker:
         
         for face_index, face_embedding in enumerate(face_embeddings):
          await face_querier.insert_photo_face_with_approval(
-             InsertPhotoFaceWithApprovalParams(
+           InsertPhotoFaceWithApprovalParams(
             photo_id=event.photo_id,
             face_index=face_index,
             column_3=face_embedding,
-            face_embedding=None, 
+            face_embedding=SIMILARITY_THRESHOLD, 
             bbox="",
             decision=PhotoApprovalDecision.PENDING.value,
             )
