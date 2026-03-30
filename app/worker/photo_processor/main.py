@@ -94,13 +94,11 @@ class PhotoGroupProcessWorker:
                 logger.info("Face %s did not match any enrolled user", face_index)
                 continue    
             #photo face record creation with matched user 
-            bbox = str(face_embeddings[face_index])  # store as string representation
             photo_face = await face_querier.upsert_photo_face(
-            photo_id=event.photo_id,
-            face_index=face_index,
-            user_id=matched_user_id,
-            dollar_3=face_embedding,
-            bbox=bbox,
+             photo_id=event.photo_id,
+             face_index=face_index,
+             user_id=matched_user_id,
+             dollar_3=face_embedding,
          )
         if photo_face is None:
            logger.warning("Failed to create photo face %s for photo %s", face_index, event.photo_id)
