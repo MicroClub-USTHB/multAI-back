@@ -83,6 +83,13 @@ WITH matched_user AS (
     ORDER BY embedding <#> $3::vector ASC
     LIMIT 1
 )
+insert_face AS (
 INSERT INTO photo_faces (photo_id, face_index, embedding, user_id, bbox)
 VALUES ($1, $2, $3::vector, (SELECT user_id FROM matched_user), $5)
+RETURNING photo_id, face_index, user_id;
+)
+INSERT INTO photo_approvals (photo_id, user_id, decision)
+SELECT photo_id, user_id, 'pending'
+FROM insert_face
+WHERE user_id IS NOT NULL
 RETURNING *;
