@@ -5,9 +5,15 @@ from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.modules['db.generated.user'] = MagicMock()
+sys.modules['app.worker.notification.settings'] = MagicMock()
+sys.modules['app.worker.notification.notification_queue'] = MagicMock()
+sys.modules['app.service.user_notification'] = MagicMock()
 
 from app.worker.photo_processor.main import PhotoGroupProcessWorker  # noqa: E402
 from app.worker.photo_processor.schema.event import PhotoGroupProcessEvent  # noqa: E402
+
+sys.modules['db.generated.user'] = MagicMock()
+
 
 
 @pytest.fixture
@@ -20,6 +26,8 @@ def worker() -> Generator[PhotoGroupProcessWorker, None, None]:
     w._conn = MagicMock()
     w._bucket = create_autospec(ImageBucket, instance=True)
     w._face_service = create_autospec(FaceEmbeddingService, instance=True)
+    w._notification_service = MagicMock()
+    w._notification_service.create_notification = AsyncMock()
     yield w
 
 

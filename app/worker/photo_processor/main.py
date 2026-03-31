@@ -11,7 +11,11 @@ from app.service.face_embedding import FaceEmbeddingService, FaceImagePayload
 from app.worker.photo_processor.schema.event import PhotoGroupProcessEvent
 from db.generated import photo_faces as photo_face_queries
 from db.generated.photo_faces import InsertPhotoFaceWithApprovalParams
-
+from app.service.user_notification import UserNotificationService
+from app.worker.notification.notification_queue import NotificationQueue
+from app.worker.notification.settings import NotificationWorkerSettings
+from app.schema.notification import UnifiedNotification, NotificationPriority
+from db.generated import notifications as notification_queries
 
 SIMILARITY_THRESHOLD = 0.5
 STREAM_NAME = "photos"
@@ -27,6 +31,7 @@ class PhotoGroupProcessWorker:
         self._conn: sqlalchemy.ext.asyncio.AsyncConnection | None = None
         self._face_service: FaceEmbeddingService | None = None
         self._bucket: ImageBucket | None = None
+        self._notification_service: UserNotificationService | None = None
 
     async def start(self) -> None:
         if self._conn is not None:
@@ -34,6 +39,11 @@ class PhotoGroupProcessWorker:
         self._conn = await engine.connect()
         self._face_service = FaceEmbeddingService()
         self._bucket = ImageBucket(file_prefix="photos")
+        notification_queue = NotificationQueue(NotificationWorkerSettings()) # type: ignore
+        self._notification_service = UserNotificationService(
+            notification_querier=notification_queries.AsyncQuerier(self._conn),
+            notification_queue=notification_queue,
+        )
 
     async def stop(self) -> None:
         if self._conn is not None:
@@ -41,9 +51,10 @@ class PhotoGroupProcessWorker:
             self._conn = None
             self._face_service = None
             self._bucket = None
+            self._notification_service = None
 
     async def process(self, event: PhotoGroupProcessEvent) -> None:
-        if self._conn is None or self._face_service is None or self._bucket is None:
+        if self._conn is None or self._face_service is None or self._bucket is None or self._notification_service is None:
             raise RuntimeError("Worker not started")
 
         # 1. fetch photo from MinIO
@@ -66,7 +77,7 @@ class PhotoGroupProcessWorker:
         face_querier = photo_face_queries.AsyncQuerier(self._conn)
 
         for face_index, face_embedding in enumerate(face_embeddings):
-         await face_querier.insert_photo_face_with_approval(
+         approval = await face_querier.insert_photo_face_with_approval(
            InsertPhotoFaceWithApprovalParams(
             photo_id=event.photo_id,
             face_index=face_index,
@@ -76,6 +87,27 @@ class PhotoGroupProcessWorker:
             decision=PhotoApprovalDecision.PENDING.value,
             )
         )
+         if approval is None:
+                logger.info("No match found for face %s in photo %s", face_index, event.photo_id)
+                continue
+         assert approval is not None
+    # notify the matched user
+         await self._notification_service.create_notification(
+            user_id=approval.user_id,
+            type="photo_approval",
+            payload={"photo_id": str(approval.photo_id)},
+            notification=UnifiedNotification(
+                title="You were found in a photo",
+                body="Tap to review and approve or reject",
+                data={
+                    "photo_id": str(approval.photo_id),
+                    "type": "photo_approval",
+                },
+                tokens=[],
+                priority=NotificationPriority.NORMAL,
+            ),
+         )
+        logger.info("Notified user %s for photo %s", approval.user_id, approval.photo_id) # type: ignore
 
 
 def _parse_payload(raw_data: bytes) -> dict[str, Any] | None:
