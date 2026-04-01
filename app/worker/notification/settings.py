@@ -5,7 +5,7 @@ from typing import ClassVar, Sequence
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.schema.notification import NotificationPriority, PRIORITY_ORDER
+from app.schema.internal.notification import NotificationPriority, PRIORITY_ORDER
 
 
 class NotificationWorkerSettings(BaseSettings):

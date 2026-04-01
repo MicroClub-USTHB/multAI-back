@@ -17,10 +17,6 @@ class Settings(BaseSettings):
     NATS_HOST: str
     NATS_PASSWORD: str
     NATS_USER: str
-    NATS_SINGLE_FACE_MATCH_STREAM: str = "single_face_matches"
-    NATS_SINGLE_FACE_MATCH_DURABLE: str = "single_face_match_worker"
-
-
     # MinIO
     MINIO_API_PORT: int
     MINIO_ROOT_USER: str
@@ -75,12 +71,15 @@ class Settings(BaseSettings):
     @field_validator("debug", mode="before")
     @classmethod
     def _parse_debug(cls, value):  # type: ignore[no-untyped-def]
+        if value is None:
+            return True
         if isinstance(value, str):
             lowered = value.strip().lower()
             if lowered in {"release", "prod", "production", "false", "0", "no"}:
                 return False
             if lowered in {"true", "1", "yes"}:
                 return True
+            return value
         return value
 
 

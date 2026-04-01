@@ -32,7 +32,7 @@ class NatsSubjects(Enum):
     STAFF_UPLOAD_REQUEST_CREATED = "staff.upload_request.created"
     STAFF_UPLOAD_REQUEST_APPROVED = "staff.upload_request.approved"
     STAFF_UPLOAD_REQUEST_REJECTED = "staff.upload_request.rejected"
-    SINGLE_FACE_MATCH_REQUESTED = "photo_faces.single.requested"
+    PHOTO_PROCESS = "photo.process"
 
 
 class NatsClient:
@@ -134,7 +134,7 @@ class NatsClient:
         try:
             await js.stream_info(stream_name)
         except NotFoundError:
-            await js.add_stream(
+            await js.add_stream( # type: ignore
                 name=stream_name,
                 config=StreamConfig(
                     name=stream_name,

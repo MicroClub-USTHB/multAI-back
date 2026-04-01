@@ -7,6 +7,8 @@ import uuid
 
 from sqlalchemy.exc import IntegrityError
 
+from app.schema.internal.uploads import UploadPhotoInput
+from app.core.constant import AuditEventType
 from app.core.exceptions import AppException
 from app.core.logger import logger
 from app.infra.google_drive import (
@@ -15,7 +17,8 @@ from app.infra.google_drive import (
     GoogleDriveFileMetadata,
 )
 from app.infra.nats import NatsClient, NatsSubjects
-from app.schema.dto.staff.uploads import UploadPhotoInput
+from app.schema.request.staff.uploads import UploadPhotoInput
+from app.service.audit import AuditService
 from app.service.staged_upload_storage import PreviewObject, StagedUploadStorageService
 from app.service.staff_drive import StaffDriveService
 from app.service.staff_notifications import StaffNotificationsService
@@ -24,6 +27,7 @@ from db.generated import upload_request_groups as upload_request_group_queries
 from db.generated import upload_request_photos as upload_request_photo_queries
 from db.generated import upload_requests as upload_request_queries
 from db.generated.models import (
+    Photo,
     StaffRole,
     StaffUser,
     UploadRequest,
@@ -58,6 +62,7 @@ class UploadRequestsService:
         staged_upload_storage: StagedUploadStorageService,
         staff_drive_service: StaffDriveService,
         staff_notifications_service: StaffNotificationsService,
+        audit_service: AuditService | None = None,
     ):
         self.upload_request_group_querier = upload_request_group_querier
         self.upload_request_querier = upload_request_querier
@@ -66,6 +71,7 @@ class UploadRequestsService:
         self.staged_upload_storage = staged_upload_storage
         self.staff_drive_service = staff_drive_service
         self.staff_notifications_service = staff_notifications_service
+        self.audit_service = audit_service
 
     @staticmethod
     def _status_value(status: object) -> str:
@@ -259,7 +265,7 @@ class UploadRequestsService:
         publish_event: bool = True,
     ) -> UploadRequestDetails:
         self._validate_create_request_inputs(photos)
-
+        upload_request = None
         try:
             upload_request = await self.upload_request_querier.create_upload_request(
                 event_id=event_id,
@@ -309,7 +315,7 @@ class UploadRequestsService:
         *,
         request_id: uuid.UUID,
         approved_by: StaffUser,
-    ) -> tuple[UploadRequest, list[UploadRequestPhoto], list[str]]:
+    ) -> tuple[UploadRequest, list[UploadRequestPhoto], list[str], list[Photo]]:
         existing = await self.upload_request_querier.get_upload_request_by_id(id=request_id)
         if existing is None:
             raise AppException.not_found("Upload request not found")
@@ -321,6 +327,7 @@ class UploadRequestsService:
             raise AppException.bad_request("No staged photos found for this upload request")
 
         finalized_storage_keys: list[str] = []
+        created_photos: list[Photo] = []
         try:
             for staged_photo in staged_photos:
                 final_storage_key = await self.staged_upload_storage.promote_to_final(
@@ -341,6 +348,7 @@ class UploadRequestsService:
                 )
                 if created_photo is None:
                     raise AppException.internal_error("Failed to finalize staged photo")
+                created_photos.append(created_photo)
                 updated_photo = await self.upload_request_photo_querier.update_upload_request_photo_approval(
                     id=staged_photo.id,
                     status="approved",
@@ -359,7 +367,7 @@ class UploadRequestsService:
             await self._cleanup_finalized_objects(finalized_storage_keys)
             raise
 
-        return upload_request, staged_photos, finalized_storage_keys
+        return upload_request, staged_photos, finalized_storage_keys, created_photos
 
     async def _reject_request_without_side_effects(
         self,
@@ -447,6 +455,26 @@ class UploadRequestsService:
         except Exception as exc:
             logger.warning("Failed to publish upload request event %s: %s", subject.value, exc)
 
+    async def _audit(self, event_type: AuditEventType, **metadata: object) -> None:
+        if self.audit_service is not None:
+            await self.audit_service.create_record(
+                event_type=event_type,
+                metadata={k: str(v) for k, v in metadata.items()},
+            )
+
+    async def _publish_photo_process_events(self, photos: list[Photo]) -> None:
+        for photo in photos:
+            await self._publish_event(
+                subject=NatsSubjects.PHOTO_PROCESS,
+                payload={
+                    "photo_id": str(photo.id),
+                    "image_ref": photo.storage_key,
+                    "event_id": str(photo.event_id),
+                },
+            )
+        if photos:
+            logger.info("Published %d photo process events", len(photos))
+
     async def create_upload(
         self,
         *,
@@ -497,6 +525,7 @@ class UploadRequestsService:
         day_number: int | None,
         requested_by: StaffUser,
     ) -> UploadRequestGroupDetails:
+        upload_group = None
         access_token = await self.staff_drive_service.get_access_token_for_staff_user(
             requested_by.id
         )
@@ -746,7 +775,7 @@ class UploadRequestsService:
         request_id: uuid.UUID,
         approved_by: StaffUser,
     ) -> UploadRequestDetails:
-        upload_request, staged_photos, finalized_storage_keys = (
+        upload_request, staged_photos, finalized_storage_keys, created_photos = (
             await self._approve_request_without_side_effects(
                 request_id=request_id,
                 approved_by=approved_by,
@@ -773,6 +802,12 @@ class UploadRequestsService:
                     "approved_by": str(approved_by.id),
                     "photo_count": upload_request.photo_count,
                 },
+            )
+            await self._publish_photo_process_events(created_photos)
+            await self._audit(
+                AuditEventType.UPLOAD_REQUEST_APPROVED,
+                request_id=upload_request.id,
+                approved_by=approved_by.id,
             )
         except Exception:
             await self._cleanup_finalized_objects(finalized_storage_keys)
@@ -820,6 +855,12 @@ class UploadRequestsService:
             },
         )
         await self._delete_staging_objects_best_effort(staged_photos)
+        await self._audit(
+            AuditEventType.UPLOAD_REQUEST_REJECTED,
+            request_id=upload_request.id,
+            approved_by=approved_by.id,
+            reason=reason or "",
+        )
         return UploadRequestDetails(request=upload_request, photos=rejected_photos)
 
     async def approve_group(
@@ -838,10 +879,11 @@ class UploadRequestsService:
 
         approved_requests: list[UploadRequest] = []
         all_staged_photos: list[UploadRequestPhoto] = []
+        all_created_photos: list[Photo] = []
         finalized_storage_keys: list[str] = []
         try:
             for request_details in pending_requests:
-                approved_request, staged_photos, request_storage_keys = (
+                approved_request, staged_photos, request_storage_keys, created_photos = (
                     await self._approve_request_without_side_effects(
                         request_id=request_details.request.id,
                         approved_by=approved_by,
@@ -849,6 +891,7 @@ class UploadRequestsService:
                 )
                 approved_requests.append(approved_request)
                 all_staged_photos.extend(staged_photos)
+                all_created_photos.extend(created_photos)
                 finalized_storage_keys.extend(request_storage_keys)
 
             upload_group = await self.upload_request_group_querier.approve_upload_request_group(
@@ -890,6 +933,12 @@ class UploadRequestsService:
                     "total_photo_count": upload_group.total_photo_count,
                     "batch_count": upload_group.batch_count,
                 },
+            )
+            await self._publish_photo_process_events(all_created_photos)
+            await self._audit(
+                AuditEventType.UPLOAD_REQUEST_APPROVED,
+                group_id=upload_group.id,
+                approved_by=approved_by.id,
             )
         except Exception:
             await self._cleanup_finalized_objects(finalized_storage_keys)

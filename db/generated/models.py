@@ -38,8 +38,8 @@ class ProcessingJobStatus(str, enum.Enum):
 
 class StaffRole(str, enum.Enum):
     ADMIN = "admin"
-    MULTI = "multi"
     MULTI_TEAM_LEAD = "multi_team_lead"
+    MULTI = "multi"
 
 
 class UploadRequestStatus(str, enum.Enum):
@@ -185,7 +185,6 @@ class StaffUser:
 class UploadRequest:
     id: uuid.UUID
     event_id: uuid.UUID
-    group_id: Optional[uuid.UUID]
     drive_file_id: Optional[str]
     requested_by: uuid.UUID
     approved_by: Optional[uuid.UUID]
@@ -194,6 +193,7 @@ class UploadRequest:
     approved_at: Optional[datetime.datetime]
     photo_count: int
     rejection_reason: Optional[str]
+    group_id: Optional[uuid.UUID]
 
 
 @dataclasses.dataclass()
@@ -237,7 +237,6 @@ class User:
     updated_at: datetime.datetime
     display_name: Optional[str]
     face_embedding: Optional[Any]
-    blocked: bool
     deleted_at: Optional[datetime.datetime]
     blocked: bool
 
@@ -248,13 +247,13 @@ class UserDevice:
     user_id: uuid.UUID
     device_name: Optional[str]
     device_type: Optional[str]
-    push_token: Optional[str]
     totp_secret: Optional[str]
-    is_active: bool
-    is_invalid_token: bool
     is_2fa_enabled: bool
     last_active: datetime.datetime
     created_at: datetime.datetime
+    push_token: Optional[str]
+    is_active: bool
+    is_invalid_token: bool
 
 
 @dataclasses.dataclass()
