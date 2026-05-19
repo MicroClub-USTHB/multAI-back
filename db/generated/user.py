@@ -2,6 +2,7 @@
 # versions:
 #   sqlc v1.30.0
 # source: user.sql
+import dataclasses
 from typing import Any, AsyncIterator, Optional
 import uuid
 
@@ -14,7 +15,7 @@ from db.generated import models
 CREATE_USER = """-- name: create_user \\:one
 INSERT INTO users (email, hashed_password)
 VALUES (:p1, :p2)
-RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at
+RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
 """
 
 
@@ -24,25 +25,64 @@ WHERE id = :p1
 """
 
 
+FIND_CLOSEST_USER_BY_EMBEDDING = """-- name: find_closest_user_by_embedding \\:one
+SELECT id,
+       (face_embedding <=> :p1\\:\\:vector) AS distance
+FROM users
+WHERE face_embedding IS NOT NULL
+ORDER BY distance ASC
+LIMIT 1
+"""
+
+
+@dataclasses.dataclass()
+class FindClosestUserByEmbeddingRow:
+    id: uuid.UUID
+    distance: Optional[Any]
+
+
 GET_USER_BY_EMAIL = """-- name: get_user_by_email \\:one
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at
+SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
 FROM users
 WHERE email = :p1
 """
 
 
 GET_USER_BY_ID = """-- name: get_user_by_id \\:one
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at
+SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
 FROM users
 WHERE id = :p1
 """
 
 
 LIST_USERS = """-- name: list_users \\:many
-SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at
+SELECT id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
 FROM users
 ORDER BY created_at DESC
 LIMIT :p1 OFFSET :p2
+"""
+
+
+LIST_USERS_WITH_EMBEDDING = """-- name: list_users_with_embedding \\:many
+SELECT id, face_embedding
+FROM users
+WHERE face_embedding IS NOT NULL
+AND deleted_at IS NULL
+"""
+
+
+@dataclasses.dataclass()
+class ListUsersWithEmbeddingRow:
+    id: uuid.UUID
+    face_embedding: Optional[Any]
+
+
+SET_USER_BLOCKED = """-- name: set_user_blocked \\:one
+UPDATE users
+SET blocked = :p1,
+    updated_at = NOW()
+WHERE id = :p2
+RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
 """
 
 
@@ -51,7 +91,18 @@ UPDATE users
 SET face_embedding = :p1\\:\\:vector,
     updated_at = NOW()
 WHERE id = :p2
-RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at
+RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
+"""
+
+
+UPDATE_USER = """-- name: update_user \\:one
+UPDATE users
+SET email = COALESCE(:p1, email),
+    display_name = COALESCE(:p2, display_name),
+    blocked = COALESCE(:p3, blocked),
+    updated_at = NOW()
+WHERE id = :p4
+RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
 """
 
 
@@ -60,7 +111,7 @@ UPDATE users
 SET hashed_password = :p1,
     updated_at = NOW()
 WHERE id = :p2
-RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at
+RETURNING id, email, hashed_password, created_at, updated_at, display_name, face_embedding, deleted_at, blocked
 """
 
 
@@ -81,10 +132,20 @@ class AsyncQuerier:
             display_name=row[5],
             face_embedding=row[6],
             deleted_at=row[7],
+            blocked=row[8],
         )
 
     async def delete_user(self, *, id: uuid.UUID) -> None:
         await self._conn.execute(sqlalchemy.text(DELETE_USER), {"p1": id})
+
+    async def find_closest_user_by_embedding(self, *, dollar_1: Any) -> Optional[FindClosestUserByEmbeddingRow]:
+        row = (await self._conn.execute(sqlalchemy.text(FIND_CLOSEST_USER_BY_EMBEDDING), {"p1": dollar_1})).first()
+        if row is None:
+            return None
+        return FindClosestUserByEmbeddingRow(
+            id=row[0],
+            distance=row[1],
+        )
 
     async def get_user_by_email(self, *, email: str) -> Optional[models.User]:
         row = (await self._conn.execute(sqlalchemy.text(GET_USER_BY_EMAIL), {"p1": email})).first()
@@ -99,6 +160,7 @@ class AsyncQuerier:
             display_name=row[5],
             face_embedding=row[6],
             deleted_at=row[7],
+            blocked=row[8],
         )
 
     async def get_user_by_id(self, *, id: uuid.UUID) -> Optional[models.User]:
@@ -114,6 +176,7 @@ class AsyncQuerier:
             display_name=row[5],
             face_embedding=row[6],
             deleted_at=row[7],
+            blocked=row[8],
         )
 
     async def list_users(self, *, limit: int, offset: int) -> AsyncIterator[models.User]:
@@ -128,7 +191,32 @@ class AsyncQuerier:
                 display_name=row[5],
                 face_embedding=row[6],
                 deleted_at=row[7],
+                blocked=row[8],
             )
+
+    async def list_users_with_embedding(self) -> AsyncIterator[ListUsersWithEmbeddingRow]:
+        result = await self._conn.stream(sqlalchemy.text(LIST_USERS_WITH_EMBEDDING))
+        async for row in result:
+            yield ListUsersWithEmbeddingRow(
+                id=row[0],
+                face_embedding=row[1],
+            )
+
+    async def set_user_blocked(self, *, blocked: bool, id: uuid.UUID) -> Optional[models.User]:
+        row = (await self._conn.execute(sqlalchemy.text(SET_USER_BLOCKED), {"p1": blocked, "p2": id})).first()
+        if row is None:
+            return None
+        return models.User(
+            id=row[0],
+            email=row[1],
+            hashed_password=row[2],
+            created_at=row[3],
+            updated_at=row[4],
+            display_name=row[5],
+            face_embedding=row[6],
+            deleted_at=row[7],
+            blocked=row[8],
+        )
 
     async def set_user_embedding(self, *, dollar_1: Any, id: uuid.UUID) -> Optional[models.User]:
         row = (await self._conn.execute(sqlalchemy.text(SET_USER_EMBEDDING), {"p1": dollar_1, "p2": id})).first()
@@ -143,6 +231,28 @@ class AsyncQuerier:
             display_name=row[5],
             face_embedding=row[6],
             deleted_at=row[7],
+            blocked=row[8],
+        )
+
+    async def update_user(self, *, email: str, display_name: Optional[str], blocked: bool, id: uuid.UUID) -> Optional[models.User]:
+        row = (await self._conn.execute(sqlalchemy.text(UPDATE_USER), {
+            "p1": email,
+            "p2": display_name,
+            "p3": blocked,
+            "p4": id,
+        })).first()
+        if row is None:
+            return None
+        return models.User(
+            id=row[0],
+            email=row[1],
+            hashed_password=row[2],
+            created_at=row[3],
+            updated_at=row[4],
+            display_name=row[5],
+            face_embedding=row[6],
+            deleted_at=row[7],
+            blocked=row[8],
         )
 
     async def update_user_password(self, *, hashed_password: Optional[str], id: uuid.UUID) -> Optional[models.User]:
@@ -158,4 +268,5 @@ class AsyncQuerier:
             display_name=row[5],
             face_embedding=row[6],
             deleted_at=row[7],
+            blocked=row[8],
         )

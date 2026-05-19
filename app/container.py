@@ -13,15 +13,21 @@ from app.service.staff_notifications import StaffNotificationsService
 from app.service.staff_user import StaffUserService
 
 from app.service.audit import AuditService
+from app.service.photo_approval import PhotoApprovalService
+from app.service.user_photo import UserPhotoService
 from app.service.upload_requests import UploadRequestsService
 from app.service.users import AuthService
 from app.service.user_notification import UserNotificationService
 from db.generated import devices as device_queries
+from db.generated import photo_approvals as photo_approval_queries
+from db.generated import processing_jobs as processing_job_queries
+from db.generated import photo_faces as photo_face_queries
 from db.generated import photos as photo_queries
 from db.generated import session as session_queries
 from db.generated import staff_drive_connections as staff_drive_queries
 from db.generated import staff_notifications as staff_notification_queries
 from db.generated import stuff_user as staff_user_queries
+from db.generated import upload_request_groups as upload_request_group_queries
 from db.generated import upload_request_photos as upload_request_photo_queries
 from db.generated import upload_requests as upload_request_queries
 from db.generated import user as user_queries
@@ -51,9 +57,13 @@ class Container:
         self.device_querier = device_queries.AsyncQuerier(conn)
         self.staff_user_querier = staff_user_queries.AsyncQuerier(conn)
         self.staff_drive_querier = staff_drive_queries.AsyncQuerier(conn)
+        self.upload_request_group_querier = upload_request_group_queries.AsyncQuerier(conn)
         self.upload_request_querier = upload_request_queries.AsyncQuerier(conn)
         self.upload_request_photo_querier = upload_request_photo_queries.AsyncQuerier(conn)
         self.photo_querier = photo_queries.AsyncQuerier(conn)
+        self.photo_approval_querier = photo_approval_queries.AsyncQuerier(conn)
+        self.photo_face_querier = photo_face_queries.AsyncQuerier(conn)
+        self.processing_job_querier = processing_job_queries.AsyncQuerier(conn)
         self.staff_notification_querier = staff_notification_queries.AsyncQuerier(conn)
         self.notification_querier = notification_queries.AsyncQuerier(conn)
         self.audit_querier = audit_queries.AsyncQuerier(conn)
@@ -93,13 +103,20 @@ class Container:
         )
         self.staged_upload_storage_service = StagedUploadStorageService()
 
+        self.audit_service = AuditService(
+            audit_querier=self.audit_querier,
+            user_querier=self.user_querier,
+        )
+
         self.upload_requests_service = UploadRequestsService(
+            upload_request_group_querier=self.upload_request_group_querier,
             upload_request_querier=self.upload_request_querier,
             upload_request_photo_querier=self.upload_request_photo_querier,
             photo_querier=self.photo_querier,
             staged_upload_storage=self.staged_upload_storage_service,
             staff_drive_service=self.staff_drive_service,
             staff_notifications_service=self.staff_notifications_service,
+            audit_service=self.audit_service,
         )
 
         notification_queue = NotificationQueue(settings=NotifSetting)
@@ -107,21 +124,30 @@ class Container:
         self.user_notifications_service = UserNotificationService(
             notification_querier=self.notification_querier,
             notification_queue=notification_queue,
-        )
-
-        self.audit_service = AuditService(
-            audit_querier=self.audit_querier,
-            user_querier=self.user_querier,
+            device_querier=self.device_querier,
         )
 
         self.staff_user_service = StaffUserService()
-
         self.staff_user_service.init(
             staff_user_querier=self.staff_user_querier,)
 
         self.event_service = EventService(
             e_querier=self.event_querier,
             p_querier=self.participant_querier,
+        )
+
+        self.photo_approval_service = PhotoApprovalService(
+            photo_approval_querier=self.photo_approval_querier,
+            photo_querier=self.photo_querier,
+            storage_service=self.staged_upload_storage_service,
+            audit_service=self.audit_service,
+        )
+
+        self.user_photo_service = UserPhotoService(
+            photo_querier=self.photo_querier,
+            photo_face_querier=self.photo_face_querier,
+            photo_approval_querier=self.photo_approval_querier,
+            staff_drive_service=self.staff_drive_service,
         )
 
 async def get_container(

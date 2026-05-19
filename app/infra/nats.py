@@ -2,12 +2,18 @@ from enum import Enum
 from typing import Any, Callable, Optional
 from nats.aio.client import Client as NATS
 from nats.js.client import JetStreamContext
-from nats.js.api import DeliverPolicy, AckPolicy
+from nats.js.api import DeliverPolicy, AckPolicy, StreamConfig
+from nats.js.errors import NotFoundError
 from nats.aio.msg import Msg
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.core.constant import NOTIFICATION_EVENT_SUBJECT, AUDIT_EVENT_SUBJECT
+from app.core.constant import (
+    AUDIT_EVENT_SUBJECT,
+    FINAL_BUCKET_CLEANUP_SUBJECT,
+    NOTIFICATION_EVENT_SUBJECT,
+    UPLOAD_GROUP_IMPORT_SUBJECT,
+)
 
 
 class Message(BaseModel):
@@ -20,9 +26,16 @@ class NatsSubjects(Enum):
     USER_LOGOUT = "user.logout"
     NOTIFICATION_EVENT = NOTIFICATION_EVENT_SUBJECT
     AUDIT_EVENT = AUDIT_EVENT_SUBJECT
+    STAFF_UPLOAD_GROUP_IMPORT_REQUESTED = UPLOAD_GROUP_IMPORT_SUBJECT
+    STAFF_UPLOAD_GROUP_CREATED = "staff.upload_group.created"
+    STAFF_UPLOAD_GROUP_APPROVED = "staff.upload_group.approved"
+    STAFF_UPLOAD_GROUP_REJECTED = "staff.upload_group.rejected"
+    FINAL_BUCKET_CLEANUP = FINAL_BUCKET_CLEANUP_SUBJECT
     STAFF_UPLOAD_REQUEST_CREATED = "staff.upload_request.created"
     STAFF_UPLOAD_REQUEST_APPROVED = "staff.upload_request.approved"
     STAFF_UPLOAD_REQUEST_REJECTED = "staff.upload_request.rejected"
+    PHOTO_PROCESS = "photo.process"
+
 
 class NatsClient:
     _nc: Optional[NATS] = None
@@ -44,7 +57,7 @@ class NatsClient:
                 password=password or settings.NATS_PASSWORD,
             )
             NatsClient._nc = nc
-            NatsClient._js = nc.jetstream() # type: ignore
+            NatsClient._js = nc.jetstream()  # type: ignore
 
     @staticmethod
     async def close() -> None:
@@ -70,11 +83,12 @@ class NatsClient:
             await NatsClient.connect()
         nc = NatsClient._nc
         assert nc is not None
+
         async def _wrapper(msg: Msg) -> None:
             await callback(msg.data)
 
         subject_name = subject.value if isinstance(subject, NatsSubjects) else subject
-        await nc.subscribe(subject_name, cb=_wrapper) # type: ignore
+        await nc.subscribe(subject_name, cb=_wrapper)  # type: ignore
 
 
     @staticmethod
@@ -83,7 +97,7 @@ class NatsClient:
             await NatsClient.connect()
         js = NatsClient._js
         assert js is not None
-        subject_name = subject.value if isinstance(subject, NatsSubjects) else subject # type: ignore
+        subject_name = subject.value if isinstance(subject, NatsSubjects) else subject  # type: ignore
         await js.publish(subject_name, message, stream=stream_name)
 
     @staticmethod
@@ -97,17 +111,35 @@ class NatsClient:
         if NatsClient._js is None:
             await NatsClient.connect()
 
+        await NatsClient.ensure_stream(stream_name=stream_name, subjects=[subject.value])
+
         async def _wrapper(msg: Msg) -> None:
             await callback(msg.data)
             await msg.ack()
         js = NatsClient._js
         assert js is not None
-        subject_name = subject.value
         await js.subscribe(
-            subject=subject_name,
+            subject=subject.value,
             stream=stream_name,
             durable=durable_name,
             cb=_wrapper,
             deliver_policy=DeliverPolicy.NEW,
             # ack_policy=ack_policy
         )
+
+    @staticmethod
+    async def ensure_stream(*, stream_name: str, subjects: list[str]) -> None:
+        if NatsClient._js is None:
+            await NatsClient.connect()
+        js = NatsClient._js
+        assert js is not None
+        try:
+            await js.stream_info(stream_name)
+        except NotFoundError:
+            await js.add_stream( # type: ignore
+                name=stream_name,
+                config=StreamConfig(
+                    name=stream_name,
+                    subjects=subjects,
+                ),
+            )

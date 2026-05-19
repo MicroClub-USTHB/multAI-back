@@ -2,7 +2,8 @@
 # versions:
 #   sqlc v1.30.0
 # source: upload_requests.sql
-from typing import AsyncIterator, Optional
+import dataclasses
+from typing import Any, AsyncIterator, Optional
 import uuid
 
 import sqlalchemy
@@ -19,35 +20,82 @@ SET status = 'approved',
     rejection_reason = NULL
 WHERE id = :p1
   AND status = 'pending'
-RETURNING id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason
+RETURNING id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
 """
 
 
 CREATE_UPLOAD_REQUEST = """-- name: create_upload_request \\:one
 INSERT INTO upload_requests (
     event_id,
+    group_id,
     drive_file_id,
     requested_by,
     photo_count
 ) VALUES (
-    :p1, :p2, :p3, :p4
+    :p1, :p2, :p3, :p4, :p5
 )
-RETURNING id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason
+RETURNING id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
+"""
+
+
+@dataclasses.dataclass()
+class CreateUploadRequestParams:
+    event_id: uuid.UUID
+    group_id: Optional[uuid.UUID]
+    drive_file_id: Optional[str]
+    requested_by: uuid.UUID
+    photo_count: int
+
+
+DELETE_UPLOAD_REQUEST = """-- name: delete_upload_request \\:exec
+DELETE FROM upload_requests
+WHERE id = :p1
 """
 
 
 GET_UPLOAD_REQUEST_BY_ID = """-- name: get_upload_request_by_id \\:one
-SELECT id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason
+SELECT id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
 FROM upload_requests
 WHERE id = :p1
 """
 
 
 LIST_UPLOAD_REQUESTS = """-- name: list_upload_requests \\:many
-SELECT id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason
+SELECT id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
 FROM upload_requests
-WHERE requested_by = :p1\\:\\:uuid
-  AND status  = COALESCE(:p2\\:\\:upload_request_status, status)
+ORDER BY created_at DESC
+"""
+
+
+LIST_UPLOAD_REQUESTS_BY_GROUP_ID = """-- name: list_upload_requests_by_group_id \\:many
+SELECT id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
+FROM upload_requests
+WHERE group_id = :p1
+ORDER BY created_at ASC
+"""
+
+
+LIST_UPLOAD_REQUESTS_BY_REQUESTER = """-- name: list_upload_requests_by_requester \\:many
+SELECT id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
+FROM upload_requests
+WHERE requested_by = :p1
+ORDER BY created_at DESC
+"""
+
+
+LIST_UPLOAD_REQUESTS_BY_REQUESTER_AND_STATUS = """-- name: list_upload_requests_by_requester_and_status \\:many
+SELECT id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
+FROM upload_requests
+WHERE requested_by = :p1
+  AND status = :p2
+ORDER BY created_at DESC
+"""
+
+
+LIST_UPLOAD_REQUESTS_BY_STATUS = """-- name: list_upload_requests_by_status \\:many
+SELECT id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
+FROM upload_requests
+WHERE status = :p1
 ORDER BY created_at DESC
 """
 
@@ -60,7 +108,7 @@ SET status = 'rejected',
     rejection_reason = :p3
 WHERE id = :p1
   AND status = 'pending'
-RETURNING id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason
+RETURNING id, event_id, drive_file_id, requested_by, approved_by, status, created_at, approved_at, photo_count, rejection_reason, group_id
 """
 
 
@@ -83,14 +131,16 @@ class AsyncQuerier:
             approved_at=row[7],
             photo_count=row[8],
             rejection_reason=row[9],
+            group_id=row[10],
         )
 
-    async def create_upload_request(self, *, event_id: uuid.UUID, drive_file_id: Optional[str], requested_by: uuid.UUID, photo_count: int) -> Optional[models.UploadRequest]:
+    async def create_upload_request(self, arg: CreateUploadRequestParams) -> Optional[models.UploadRequest]:
         row = (await self._conn.execute(sqlalchemy.text(CREATE_UPLOAD_REQUEST), {
-            "p1": event_id,
-            "p2": drive_file_id,
-            "p3": requested_by,
-            "p4": photo_count,
+            "p1": arg.event_id,
+            "p2": arg.group_id,
+            "p3": arg.drive_file_id,
+            "p4": arg.requested_by,
+            "p5": arg.photo_count,
         })).first()
         if row is None:
             return None
@@ -105,7 +155,11 @@ class AsyncQuerier:
             approved_at=row[7],
             photo_count=row[8],
             rejection_reason=row[9],
+            group_id=row[10],
         )
+
+    async def delete_upload_request(self, *, id: uuid.UUID) -> None:
+        await self._conn.execute(sqlalchemy.text(DELETE_UPLOAD_REQUEST), {"p1": id})
 
     async def get_upload_request_by_id(self, *, id: uuid.UUID) -> Optional[models.UploadRequest]:
         row = (await self._conn.execute(sqlalchemy.text(GET_UPLOAD_REQUEST_BY_ID), {"p1": id})).first()
@@ -122,10 +176,11 @@ class AsyncQuerier:
             approved_at=row[7],
             photo_count=row[8],
             rejection_reason=row[9],
+            group_id=row[10],
         )
 
-    async def list_upload_requests(self, *, dollar_1: uuid.UUID, p2: Optional[models.UploadRequestStatus]) -> AsyncIterator[models.UploadRequest]:
-        result = await self._conn.stream(sqlalchemy.text(LIST_UPLOAD_REQUESTS), {"p1": dollar_1, "p2": p2})
+    async def list_upload_requests(self) -> AsyncIterator[models.UploadRequest]:
+        result = await self._conn.stream(sqlalchemy.text(LIST_UPLOAD_REQUESTS))
         async for row in result:
             yield models.UploadRequest(
                 id=row[0],
@@ -138,6 +193,75 @@ class AsyncQuerier:
                 approved_at=row[7],
                 photo_count=row[8],
                 rejection_reason=row[9],
+                group_id=row[10],
+            )
+
+    async def list_upload_requests_by_group_id(self, *, group_id: Optional[uuid.UUID]) -> AsyncIterator[models.UploadRequest]:
+        result = await self._conn.stream(sqlalchemy.text(LIST_UPLOAD_REQUESTS_BY_GROUP_ID), {"p1": group_id})
+        async for row in result:
+            yield models.UploadRequest(
+                id=row[0],
+                event_id=row[1],
+                drive_file_id=row[2],
+                requested_by=row[3],
+                approved_by=row[4],
+                status=row[5],
+                created_at=row[6],
+                approved_at=row[7],
+                photo_count=row[8],
+                rejection_reason=row[9],
+                group_id=row[10],
+            )
+
+    async def list_upload_requests_by_requester(self, *, requested_by: uuid.UUID) -> AsyncIterator[models.UploadRequest]:
+        result = await self._conn.stream(sqlalchemy.text(LIST_UPLOAD_REQUESTS_BY_REQUESTER), {"p1": requested_by})
+        async for row in result:
+            yield models.UploadRequest(
+                id=row[0],
+                event_id=row[1],
+                drive_file_id=row[2],
+                requested_by=row[3],
+                approved_by=row[4],
+                status=row[5],
+                created_at=row[6],
+                approved_at=row[7],
+                photo_count=row[8],
+                rejection_reason=row[9],
+                group_id=row[10],
+            )
+
+    async def list_upload_requests_by_requester_and_status(self, *, requested_by: uuid.UUID, status: Any) -> AsyncIterator[models.UploadRequest]:
+        result = await self._conn.stream(sqlalchemy.text(LIST_UPLOAD_REQUESTS_BY_REQUESTER_AND_STATUS), {"p1": requested_by, "p2": status})
+        async for row in result:
+            yield models.UploadRequest(
+                id=row[0],
+                event_id=row[1],
+                drive_file_id=row[2],
+                requested_by=row[3],
+                approved_by=row[4],
+                status=row[5],
+                created_at=row[6],
+                approved_at=row[7],
+                photo_count=row[8],
+                rejection_reason=row[9],
+                group_id=row[10],
+            )
+
+    async def list_upload_requests_by_status(self, *, status: Any) -> AsyncIterator[models.UploadRequest]:
+        result = await self._conn.stream(sqlalchemy.text(LIST_UPLOAD_REQUESTS_BY_STATUS), {"p1": status})
+        async for row in result:
+            yield models.UploadRequest(
+                id=row[0],
+                event_id=row[1],
+                drive_file_id=row[2],
+                requested_by=row[3],
+                approved_by=row[4],
+                status=row[5],
+                created_at=row[6],
+                approved_at=row[7],
+                photo_count=row[8],
+                rejection_reason=row[9],
+                group_id=row[10],
             )
 
     async def reject_upload_request(self, *, id: uuid.UUID, approved_by: Optional[uuid.UUID], rejection_reason: Optional[str]) -> Optional[models.UploadRequest]:
@@ -155,4 +279,5 @@ class AsyncQuerier:
             approved_at=row[7],
             photo_count=row[8],
             rejection_reason=row[9],
+            group_id=row[10],
         )

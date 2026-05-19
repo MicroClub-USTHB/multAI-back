@@ -1,10 +1,8 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 
-from app.core import constant
-from app.core.exceptions import AppException
+from app.core.exceptions import AppException, DBException
 from app.core.securite import (
-    # EmbeddingCrypto,
     hash_password,
     verify_password,
     create_acces_mobile_token,
@@ -12,6 +10,7 @@ from app.core.securite import (
     decode_refresh_mobile_token,
     Get_expiry_time,
 )
+from app.core import constant
 from app.core.config import settings
 from app.infra.redis import RedisClient
 
@@ -23,6 +22,7 @@ from db.generated import session as session_queries
 from db.generated.models import User, UserDevice
 from app.core.logger import logger
 from app.service.face_embedding import FaceImagePayload, FaceEmbeddingService
+from app.schema.internal.single_face_match import ClosestUserMatch
 
 
 class AuthService:
@@ -84,12 +84,16 @@ class AuthService:
         existing_user = await self.user_querier.get_user_by_email(email=req.email)
         user: User | None = None
 
+        is_new_user = False
         if existing_user is not None:
+            if existing_user.blocked:
+                raise AppException.forbidden("User is blocked")
             if not verify_password(req.password, existing_user.hashed_password or ""):
                 raise AppException.unauthorized("Invalid credentials")
             user = existing_user
             logger.info("existing user login: %s", req.email)
         else:
+            is_new_user = True
             hashed = hash_password(req.password)
             logger.info("creating new user for %s", req.email)
             user = await self.user_querier.create_user(
@@ -103,8 +107,6 @@ class AuthService:
         user_id: uuid.UUID = user.id
 
         session_key = constant.RedisKey.UserSessionByUser.value.format(user_id=user_id)
-        if await redis.exists(session_key):
-            raise AppException.forbidden("User already has an active session")
 
         session_count = await self.session_querier.count_user_sessions(user_id=user_id)
         if session_count and session_count >= AuthService.SESSION_LIMIT:
@@ -143,8 +145,10 @@ class AuthService:
         return MobileAuthResponse(
             access_token=access_token,
             refresh_token=refresh_token,
-        session_id=str(session.id),
+            session_id=str(session.id),
             expires_in=expiry,
+            user_id=user_id,
+            is_new_user=is_new_user,
         )
 
     async def refresh_token(
@@ -166,15 +170,11 @@ class AuthService:
         if session.expires_at < datetime.now(timezone.utc):
             raise AppException.unauthorized("Session expired")
 
-        session_key = constant.RedisKey.UserSessionByUser.value.format(
-            user_id=session.user_id
-        )
-        redis_session = await redis.get(session_key)
-
-        if not redis_session or redis_session != session_id:
-            raise AppException.unauthorized("Session invalidated")
-
-        await redis.expire(session_key, AuthService.REDIS_SESSION_TTL)
+        user = await self.user_querier.get_user_by_id(id=session.user_id)
+        if not user:
+            raise AppException.unauthorized("User not found")
+        if user.blocked:
+            raise AppException.forbidden("User is blocked")
 
         new_access_token = create_acces_mobile_token(session_id)
         new_refresh_token = create_refresh_mobile_token(session_id)
@@ -185,6 +185,7 @@ class AuthService:
             refresh_token=new_refresh_token,
             session_id=session_id,
             expires_in=expiry,
+            user_id=session.user_id,
         )
 
     async def logout(
@@ -201,16 +202,13 @@ class AuthService:
         self,
         user_id: uuid.UUID,
         image_payloads: list[FaceImagePayload],
-    ) ->User:
+    ) -> User:
         logger.info("Generating face embeddings for user %s", user_id)
 
         averaging = await self.face_embedding_service.compute_average_embedding(
             image_payloads
         )
-        # pgvector accepts input like: "[0.1, 0.2, ...]". Convert list to a vector literal.
         vector_literal = "[" + ", ".join(str(x) for x in averaging) + "]"
-        #TODO:we encrypt it here we wont store it as plaintext in the db  but the porblmem is were lossing the search as trade of in the vestor so i will let it like this until i found somthing tht fit
-        # encrypted_embedding = EmbeddingCrypto.encrypt(averaging)
         user = await self.user_querier.set_user_embedding(
             dollar_1=vector_literal,
             id=user_id,
@@ -232,13 +230,137 @@ class AuthService:
 
         if session.expires_at < datetime.now(timezone.utc):
             return False
-
-        session_key = constant.RedisKey.UserSessionByUser.value.format(
-            user_id=session.user_id
-        )
-        redis_session = await redis.get(session_key)
-
-        return redis_session == session_id
+        return True
 
     async def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         return await self.user_querier.get_user_by_id(id=user_id)
+
+    async def create_user(
+        self,
+        *,
+        email: str,
+        password: str,
+        display_name: str | None = None,
+        blocked: bool = False,
+    ) -> User:
+        try:
+            hashed = hash_password(password)
+            user = await self.user_querier.create_user(
+                email=email,
+                hashed_password=hashed,
+            )
+            if not user:
+                raise AppException.internal_error("Failed to create user")
+
+            if display_name is not None or blocked:
+                updated = await self.user_querier.update_user(
+                    email=user.email,
+                    display_name=display_name,
+                    blocked=blocked,
+                    id=user.id,
+                )
+                if not updated:
+                    raise AppException.internal_error("Failed to update user")
+                return updated
+
+            return user
+        except Exception as exc:
+            logger.error("Failed to create user: %s", exc)
+            raise DBException.handle(exc)
+
+    async def get_user(self, *, user_id: uuid.UUID) -> User:
+        user = await self.user_querier.get_user_by_id(id=user_id)
+        if not user:
+            raise AppException.not_found("User not found")
+        return user
+
+    async def list_users(self, *, limit: int, offset: int) -> list[User]:
+        try:
+            users: list[User] = []
+            async for user in self.user_querier.list_users(limit=limit, offset=offset):
+                users.append(user)
+            return users
+        except Exception as exc:
+            logger.error("Failed to list users: %s", exc)
+            raise DBException.handle(exc)
+
+    async def update_user(
+        self,
+        *,
+        user_id: uuid.UUID,
+        email: str | None = None,
+        display_name: str | None = None,
+        blocked: bool | None = None,
+    ) -> User:
+        try:
+            existing = await self.user_querier.get_user_by_id(id=user_id)
+            if not existing:
+                raise AppException.not_found("User not found")
+
+            new_email = email if email is not None else existing.email
+            new_display_name = (
+                display_name if display_name is not None else existing.display_name
+            )
+            new_blocked = blocked if blocked is not None else existing.blocked
+
+            user = await self.user_querier.update_user(
+                email=new_email,
+                display_name=new_display_name,
+                blocked=new_blocked,
+                id=user_id,
+            )
+            if not user:
+                raise AppException.internal_error("Failed to update user")
+            return user
+        except Exception as exc:
+            logger.error("Failed to update user: %s", exc)
+            raise DBException.handle(exc)
+
+    async def delete_user(self, *, redis: RedisClient, user_id: uuid.UUID) -> User:
+        try:
+            existing = await self.user_querier.get_user_by_id(id=user_id)
+            if not existing:
+                raise AppException.not_found("User not found")
+            await self.user_querier.delete_user(id=user_id)
+            session_key = constant.RedisKey.UserSessionByUser.value.format(
+                user_id=user_id
+            )
+            await redis.delete(session_key)
+            return existing
+        except Exception as exc:
+            logger.error("Failed to delete user: %s", exc)
+            raise DBException.handle(exc)
+
+    async def block_user(self, *, redis: RedisClient, user_id: uuid.UUID) -> User:
+        try:
+            user = await self.user_querier.set_user_blocked(blocked=True, id=user_id)
+            if not user:
+                raise AppException.not_found("User not found")
+
+            session_key = constant.RedisKey.UserSessionByUser.value.format(
+                user_id=user_id
+            )
+            await redis.delete(session_key)
+
+            return user
+        except Exception as exc:
+            logger.error("Failed to block user: %s", exc)
+            raise DBException.handle(exc)
+
+    async def unblock_user(self, *, user_id: uuid.UUID) -> User:
+        try:
+            user = await self.user_querier.set_user_blocked(blocked=False, id=user_id)
+            if not user:
+                raise AppException.not_found("User not found")
+            return user
+        except Exception as exc:
+            logger.error("Failed to unblock user: %s", exc)
+            raise DBException.handle(exc)
+
+    async def find_closest_user(self, *, embedding_literal: str) -> ClosestUserMatch | None:
+        row = await self.user_querier.find_closest_user_by_embedding(
+            dollar_1=embedding_literal,
+        )
+        if row is None or row.distance is None:
+            return None
+        return ClosestUserMatch(user_id=row.id, distance=float(row.distance))

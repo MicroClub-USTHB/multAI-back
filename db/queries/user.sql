@@ -20,6 +20,22 @@ SET hashed_password = $1,
 WHERE id = $2
 RETURNING *;
 
+-- name: UpdateUser :one
+UPDATE users
+SET email = COALESCE($1, email),
+    display_name = COALESCE($2, display_name),
+    blocked = COALESCE($3, blocked),
+    updated_at = NOW()
+WHERE id = $4
+RETURNING *;
+
+-- name: SetUserBlocked :one
+UPDATE users
+SET blocked = $1,
+    updated_at = NOW()
+WHERE id = $2
+RETURNING *;
+
 -- name: DeleteUser :exec
 DELETE FROM users
 WHERE id = $1;
@@ -36,3 +52,16 @@ SET face_embedding = $1::vector,
     updated_at = NOW()
 WHERE id = $2
 RETURNING *;
+
+-- name: FindClosestUserByEmbedding :one
+SELECT id,
+       (face_embedding <=> $1::vector) AS distance
+FROM users
+WHERE face_embedding IS NOT NULL
+ORDER BY distance ASC
+LIMIT 1;
+-- name: ListUsersWithEmbedding :many
+SELECT id, face_embedding
+FROM users
+WHERE face_embedding IS NOT NULL
+AND deleted_at IS NULL;

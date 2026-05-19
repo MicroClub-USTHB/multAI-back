@@ -27,8 +27,8 @@ dependencies = [
     "onnxruntime>=1.24.4",
     "python-multipart>=0.0.22",
     "firebase-admin>=6.8.0",
-    "apns2>=0.7.1",
     "pywebpush>=2.3.0",
+    "opencv-python>=4.13.0.92",
 ]
 
 [tool.ruff]
@@ -65,6 +65,11 @@ exclude = [
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
     "ruff>=0.15.5",
     "types-passlib>=1.7.4",
 ]
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
