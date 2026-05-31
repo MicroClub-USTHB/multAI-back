@@ -35,7 +35,9 @@ class Settings(BaseSettings):
     MOBILE_SESSION_LIMIT: int = 3
     MOBILE_SESSION_TTL_SECONDS: int = 180
     MOBILE_SESSION_DAYS: int = 7
-
+    # Admin list defaults
+    ADMIN_USERS_DEFAULT_LIMIT: int = 20
+    ADMIN_USERS_MAX_LIMIT: int = 100
     # Security
     jwt_secret: str
     jwt_algorithm: str = "HS256"
@@ -51,6 +53,7 @@ class Settings(BaseSettings):
     )
 
     FACE_ENCRYPTION_KEY: str
+    FIREBASE_CREDENTIALS_PATH: str = "multiai-c9380-firebase-adminsdk-fbsvc-cb6e5ce41b.json"
 
     class Config:
         env_file = ".env"

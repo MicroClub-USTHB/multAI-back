@@ -5,7 +5,6 @@ from typing import AsyncIterator
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-
 from app.core.config import settings
 from app.infra.minio import init_minio_client
 from app.infra.nats import NatsClient
