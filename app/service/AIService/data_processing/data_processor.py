@@ -15,7 +15,7 @@ class FilterFactory:
         self.filters = {
             # blur_filter: BlurFilter
         }
-    
+
     def get_filter(self, filter_type:str)->BaseFilter:
         if filter_type in self.filters:
             return self.filters[filter_type]

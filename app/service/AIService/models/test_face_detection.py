@@ -1,4 +1,4 @@
-import cv2 
+import cv2
 from face_detection import FaceDetection
 import os
 
@@ -18,7 +18,7 @@ detector.init_model()
 for img_file in image_files:
     print(f"\n[STEP] Processing image: {img_file}")
     img_path = os.path.join(IMAGE_FOLDER, img_file)
-    
+
     # Load image
     image = cv2.imread(img_path)
     print("[STEP] Image loaded.")

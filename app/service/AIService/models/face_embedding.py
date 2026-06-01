@@ -10,6 +10,6 @@ class FaceEmbedding:
 
     def init_model(self):
         pass
-    
+
     def embed(self, image)->list[float]:
         pass

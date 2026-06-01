@@ -12,8 +12,7 @@ from . import models
 
 
 COUNT__USER__DEVICES = """-- name: count__user__devices \\:one
-SELECT COUNT(*) 
-FROM user_devices
+SELECT COUNT(*) FROM user_devices
 WHERE user_id = :p1
 """
 
