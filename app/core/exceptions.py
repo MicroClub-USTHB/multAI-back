@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-
+from typing import NoReturn
 from fastapi import HTTPException
 import psycopg
 
@@ -54,14 +54,16 @@ class DBException(ABC):
         pass
 
     @staticmethod
-    def handle(exc: Exception) -> HTTPException:
+    def handle(exc: Exception) -> NoReturn:
+        if isinstance(exc, HTTPException):
+            raise exc
         if isinstance(exc, psycopg.errors.UniqueViolation):
-            return DBExceptionImpl.handle_unique_violation(exc)
+            raise DBExceptionImpl.handle_unique_violation(exc)
         if isinstance(exc, psycopg.errors.ForeignKeyViolation):
-            return DBExceptionImpl.handle_foreign_key_violation(exc)
+            raise DBExceptionImpl.handle_foreign_key_violation(exc)
         if isinstance(exc, psycopg.errors.CheckViolation):
-            return DBExceptionImpl.handle_check_violation(exc)
-        return HTTPException(status_code=500, detail="Internal server error")
+            raise DBExceptionImpl.handle_check_violation(exc)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class DBExceptionImpl(DBException):

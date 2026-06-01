@@ -8,7 +8,7 @@ from db.generated.models import UserDevice
 class DeviceService:
     device_querier: device_queries.AsyncQuerier
 
-    def init(self, device_querier: device_queries.AsyncQuerier)-> None:
+    def init(self, device_querier: device_queries.AsyncQuerier) -> None:
         self.device_querier = device_querier
     @staticmethod
     async def create_device(user_id: uuid.UUID,device_name: str,device_type: str)->UserDevice|None:
@@ -26,7 +26,7 @@ class DeviceService:
             DBException.handle(e)
 
     @staticmethod
-    async def revoke_device(device_id:uuid.UUID,user_id :uuid.UUID):
+    async def revoke_device(device_id:uuid.UUID,user_id :uuid.UUID) -> None:
         try :
             #here were cacscading the delete of the session  no need to handle it
             await DeviceService.device_querier.revoke_device(
