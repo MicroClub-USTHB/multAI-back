@@ -43,3 +43,7 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 follow_imports = "silent"
 files = ["app", "db", "migrations"]
+
+[[tool.mypy.overrides]]
+module = ["insightface", "insightface.*"]
+ignore_missing_imports = true
