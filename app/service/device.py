@@ -53,6 +53,7 @@ class DeviceService:
             device =  await DeviceService.device_querier.get_device__by_id(id=device_id)
             if device is None :
                 raise AppException.not_found("device not found ")
+            return device
         except Exception as e :
              raise DBExceptionImpl.handle(e)
 
