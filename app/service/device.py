@@ -8,7 +8,7 @@ from db.generated.models import UserDevice
 class DeviceService:
     device_querier: device_queries.AsyncQuerier
 
-    def init(self, device_querier: device_queries.AsyncQuerier):
+    def init(self, device_querier: device_queries.AsyncQuerier)-> None:
         self.device_querier = device_querier
     @staticmethod
     async def create_device(user_id: uuid.UUID,device_name: str,device_type: str)->UserDevice|None:
