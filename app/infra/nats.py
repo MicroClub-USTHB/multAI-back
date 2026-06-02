@@ -26,7 +26,7 @@ class NatsClient:
                 user=settings.NATS_USER,
                 password=settings.NATS_PASSWORD,
             )
-            NatsClient._js = NatsClient._nc.jetstream() # type: ignore
+            NatsClient._js = NatsClient._nc.jetstream() 
 
     @staticmethod
     async def close() -> None:
@@ -48,10 +48,10 @@ class NatsClient:
         if NatsClient._nc is None:
             await NatsClient.connect()
         assert NatsClient._nc is not None
-        async def _wrapper(msg:Msg):
+        async def _wrapper(msg:Msg) -> None:
             await callback(msg.data)
 
-        await NatsClient._nc.subscribe(subject.value, cb=_wrapper)# type: ignore
+        await NatsClient._nc.subscribe(subject.value, cb=_wrapper)
 
 
     @staticmethod
@@ -71,7 +71,7 @@ class NatsClient:
         if NatsClient._js is None:
             await NatsClient.connect()
 
-        async def _wrapper(msg:Msg):
+        async def _wrapper(msg:Msg) -> None:
             await callback(msg.data)
             await msg.ack()
         if NatsClient._js is None :
