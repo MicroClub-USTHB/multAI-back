@@ -1,19 +1,20 @@
 from redis.asyncio import Redis
 from app.core.constant import RedisKey
+from typing import Any
 
 
 class RedisClient:
     client: Redis
     _instance: "RedisClient | None" = None
 
-    def __new__(cls, *args, **kwargs) -> "RedisClient": # type: ignore[misc]
+    def __new__(cls: type["RedisClient"], *args: Any, **kwargs: Any) -> "RedisClient":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self, host: str, port: int, password: str) -> None:
         if not hasattr(self, "client"):
-            self.client = Redis.from_url( # type: ignore
+            self.client = Redis.from_url(
                 f"redis://{host}:{port}", password=password, decode_responses=True
             )
 
