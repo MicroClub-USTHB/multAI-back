@@ -11,6 +11,7 @@ from app.infra.minio import init_minio_client
 from app.infra.nats import NatsClient
 from app.infra.redis import RedisClient
 from app.router.mobile.auth import router as mobile_auth_router
+from collections.abc import AsyncGenerator
 
 
 
@@ -50,7 +51,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 MAX_RETRIES = 5
 RETRY_DELAY = 2  # seconds
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -104,12 +105,12 @@ app.add_middleware(
 
 
 @app.get("/")
-def read_root():
+def read_root() -> dict[str, str]:
     return {"Hello": "World"}
 
 
 @app.get("/health")
-def health_check():
+def health_check() -> dict[str, str]:
     return {"status": "healthy"}
 
 
