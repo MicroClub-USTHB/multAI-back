@@ -23,11 +23,9 @@ class Container:
         self.device_querier = device_queries.AsyncQuerier(conn)
 
         # services
-        self.session_service = SessionService()
-        self.session_service.init(
-            session=self.session_querier,
-            redis=self.redis,
-        )
+        self.session_service = SessionService( session=self.session_querier,
+            redis=self.redis)
+
 
         self.device_service = DeviceService()
         self.device_service.init(

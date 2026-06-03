@@ -15,7 +15,7 @@ def check_extension(
     if file.filename is None:
         AppException.bad_request("File should have a filename")
 
-    filename_splitted = file.filename.split(".") # type: ignore
+    filename_splitted = file.filename.split(".")
 
     if len(filename_splitted) < 2:
         AppException.bad_request("File should have an extension")

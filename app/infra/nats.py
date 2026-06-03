@@ -26,7 +26,7 @@ class NatsClient:
                 user=settings.NATS_USER,
                 password=settings.NATS_PASSWORD,
             )
-            NatsClient._js = NatsClient._nc.jetstream() 
+            NatsClient._js = NatsClient._nc.jetstream()
 
     @staticmethod
     async def close() -> None:

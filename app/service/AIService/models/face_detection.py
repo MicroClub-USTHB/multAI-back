@@ -1,4 +1,4 @@
-from insightface.app import FaceAnalysis  
+from insightface.app import FaceAnalysis
 from typing import Any
 
 
@@ -15,7 +15,7 @@ class FaceDetection:
     def init_model(self)-> None:
         if self.app is None:
             raise ValueError("model not loaded. call load_model() first.")
-        self.app.prepare(ctx_id=0, det_size=(640, 640))  
+        self.app.prepare(ctx_id=0, det_size=(640, 640))
         print("[INFO] Model initialized and ready.")
 
     def detect(self, image: Any)->list[tuple[int,int,int,int]]:

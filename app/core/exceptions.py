@@ -6,28 +6,28 @@ import psycopg
 
 class AppException:
     @staticmethod
-    def not_found(detail: str = "Resource not found") -> HTTPException:
-        return HTTPException(status_code=404, detail=detail)
+    def not_found(detail: str = "Resource not found") -> NoReturn:
+        raise HTTPException(status_code=404, detail=detail)
 
     @staticmethod
-    def unauthorized(detail: str = "Unauthorized") -> HTTPException:
-        return HTTPException(status_code=401, detail=detail)
+    def unauthorized(detail: str = "Unauthorized") -> NoReturn:
+        raise HTTPException(status_code=401, detail=detail)
 
     @staticmethod
-    def forbidden(detail: str = "Forbidden") -> HTTPException:
-        return HTTPException(status_code=403, detail=detail)
+    def forbidden(detail: str = "Forbidden") -> NoReturn:
+        raise HTTPException(status_code=403, detail=detail)
 
     @staticmethod
-    def bad_request(detail: str = "Bad request") -> HTTPException:
-        return HTTPException(status_code=400, detail=detail)
+    def bad_request(detail: str = "Bad request") -> NoReturn:
+        raise HTTPException(status_code=400, detail=detail)
 
     @staticmethod
-    def payement_required(detail:str = "payement required")->HTTPException:
-        return HTTPException(status_code=402,detail=detail)
+    def payement_required(detail:str = "payement required") -> NoReturn:
+        raise HTTPException(status_code=402,detail=detail)
 
     @staticmethod
-    def internal_error(detail: str = "Internal server error") -> HTTPException:
-        return HTTPException(status_code=500, detail=detail)
+    def internal_error(detail: str = "Internal server error") -> NoReturn:
+        raise HTTPException(status_code=500, detail=detail)
 
 
 class DBException(ABC):

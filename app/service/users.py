@@ -16,6 +16,7 @@ from app.infra.redis import RedisClient
 from app.schema.request.mobile.auth import MobileAuthRequest
 from app.schema.response.mobile.auth import MobileAuthResponse
 from db.generated import user as user_queries
+from db.generated.models import User
 from db.generated import devices as device_queries
 from db.generated import session as session_queries
 
@@ -42,8 +43,8 @@ class AuthService:
         redis: RedisClient,
         req: MobileAuthRequest,
     ) -> MobileAuthResponse:
+        user: User | None = None
         existing_user = await self.user_querier.get_user_by_email(email=req.email)
-
         if existing_user:
             if not verify_password(req.password, existing_user.hashed_password or ""):
                 raise AppException.unauthorized("Invalid credentials")
@@ -56,6 +57,7 @@ class AuthService:
             if not user:
                 raise AppException.internal_error("Failed to create user")
 
+        assert user is not None
         user_id: uuid.UUID = user.id
 
         session_key = constant.RedisKey.UserSessionByUser.value.format(user_id=user_id)
