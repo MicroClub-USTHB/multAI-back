@@ -17,7 +17,7 @@ router = APIRouter(prefix="/auth", tags=["mobile-auth"])
 async def mobile_register_login(
     req: MobileAuthRequest,
     container: Container = Depends(get_container),
-):
+) -> MobileAuthResponse:
 
     return await container.auth_service.mobile_register_login(container.redis, req)
 
@@ -26,7 +26,7 @@ async def mobile_register_login(
 async def refresh_token(
     req: RefreshTokenRequest,
     container: Container = Depends(get_container),
-):
+) -> MobileAuthResponse:
 
     return await container.auth_service.refresh_token(container.redis, req.refresh_token)
 
@@ -35,9 +35,9 @@ async def refresh_token(
 async def logout(
     container: Container = Depends(get_container),
     User:MobileUserSchema = Depends(get_current_mobile_user)
-):
+) -> None:
 
-    return await container.auth_service.logout(
+    await container.auth_service.logout(
         container.redis,
         str(User.user_id),
         str(User.session_id),
@@ -49,7 +49,7 @@ async def revoke_device(
     device_id: UUID,
     container: Container = Depends(get_container),
     current_user:MobileUserSchema = Depends(get_current_mobile_user),
-):
+) -> dict[str, str]:
 
     await container.device_service.revoke_device(
         device_id=device_id,
@@ -62,7 +62,7 @@ async def revoke_device(
 async def get_me(
     current_user:MobileUserSchema = Depends(get_current_mobile_user),
     container: Container = Depends(get_container),
-):
+) -> MeResponse:
 
     user = await container.auth_service.user_querier.get_user_by_id(id=current_user.user_id)
     if user is None :
