@@ -22,6 +22,7 @@ class AuditEventType(str, Enum):
     USER_SIGNUP = "user.signup"
     USER_LOGIN = "user.login"
     USER_LOGOUT = "user.logout"
+    FACE_ENROLLMENT_ATTEMPT = "face_enrollment.attempt"
     UPLOAD_REQUEST_CREATED = "upload_request.created"
     UPLOAD_REQUEST_APPROVED = "upload_request.approved"
     UPLOAD_REQUEST_REJECTED = "upload_request.rejected"
@@ -50,5 +51,11 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 GOOGLE_DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files/{file_id}"
 
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
+MIN_IMAGE_DIM = 64
+MAX_IMAGE_DIM = 4096
 MIN_ENROLL_IMAGES = 3
 MAX_ENROLL_IMAGES = 5
+
+ENROLL_RATE_LIMIT_MAX = 5
+ENROLL_RATE_LIMIT_WINDOW = 3600
+ENROLL_IN_PROGRESS_TTL_SECONDS = 300
