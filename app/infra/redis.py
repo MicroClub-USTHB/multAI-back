@@ -59,7 +59,8 @@ class RedisClient:
         return int(cast(int, result)) == 1
 
     async def incr(self, key: RedisKey | str) -> int:
-        return await self._client.incr(key)
+        result = await self._client.incr(key)
+        return int(cast(int, result))
 
 
     async def sadd(self, key: RedisKey | str, *values: str) -> int:
