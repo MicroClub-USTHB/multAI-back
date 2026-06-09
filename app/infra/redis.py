@@ -64,15 +64,15 @@ class RedisClient:
 
 
     async def sadd(self, key: RedisKey | str, *values: str) -> int:
-        result =  self._client.sadd(key, *values)
+        result = await self._client.sadd(key, *values)  # type: ignore[misc]
         return int(cast(int, result))
 
     async def sismember(self, key: RedisKey | str, value: str) -> bool:
-        result =  self._client.sismember(key, value)
+        result = await self._client.sismember(key, value)  # type: ignore[misc]
         return int(cast(int, result)) == 1
 
     async def srem(self, key: RedisKey | str, *values: str) -> int:
-        result =  self._client.srem(key, *values)
+        result = await self._client.srem(key, *values)  # type: ignore[misc]
         return int(cast(int, result))
 
 
