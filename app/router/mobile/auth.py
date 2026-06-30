@@ -7,15 +7,18 @@ from app.container import get_container, Container
 from app.core.config import settings
 from app.core.constant import AuditEventType
 from app.deps.token_auth import MobileUserSchema, get_current_mobile_user
+from app.deps.rate_limit import RateLimiter
 
 from app.schema.request.mobile.auth import (
     MobileLoginRequest,
     MobileRegisterRequest,
+    RegisterVerifyRequest,
+    ResendOtpRequest,
     RefreshTokenRequest,
     UpdateDeviceTokenRequest,
     InactivateDeviceRequest,
 )
-from app.schema.response.mobile.auth import MeResponse, DeviceSchema, MobileAuthResponse, SessionSchema, UserSchema
+from app.schema.response.mobile.auth import MeResponse, DeviceSchema, MobileAuthResponse, SessionSchema, UserSchema, RegisterPendingResponse
 
 router = APIRouter(prefix="/auth")
 
@@ -33,23 +36,45 @@ def _get_client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
-@router.post("/register", response_model=MobileAuthResponse)
+@router.post("/register", response_model=RegisterPendingResponse, dependencies=[Depends(RateLimiter(requests=5, window=60))])
 async def mobile_register(
     req: MobileRegisterRequest,
     request: Request,
     container: Container = Depends(get_container),
-) -> MobileAuthResponse:
+) -> RegisterPendingResponse:
     client_ip = _get_client_ip(request)
     result = await container.auth_service.mobile_register(container.redis, req, client_ip=client_ip)
+    return result
+
+
+@router.post("/register/resend-otp", response_model=RegisterPendingResponse, dependencies=[Depends(RateLimiter(requests=5, window=60))])
+async def mobile_register_resend_otp(
+    req: ResendOtpRequest,
+    request: Request,
+    container: Container = Depends(get_container),
+) -> RegisterPendingResponse:
+    client_ip = _get_client_ip(request)
+    result = await container.auth_service.mobile_register_resend_otp(container.redis, req.email, client_ip=client_ip)
+    return result
+
+
+@router.post("/register/verify", response_model=MobileAuthResponse, dependencies=[Depends(RateLimiter(requests=10, window=60))])
+async def mobile_register_verify(
+    req: RegisterVerifyRequest,
+    request: Request,
+    container: Container = Depends(get_container),
+) -> MobileAuthResponse:
+    client_ip = _get_client_ip(request)
+    result = await container.auth_service.verify_mobile_register(container.redis, req, client_ip=client_ip)
     await container.audit_service.create_record(
         event_type=AuditEventType.USER_SIGNUP,
         user_id=result.user_id,
-        metadata={"endpoint": "register"},
+        metadata={"endpoint": "register_verify"},
     )
     return result
 
 
-@router.post("/login", response_model=MobileAuthResponse)
+@router.post("/login", response_model=MobileAuthResponse, dependencies=[Depends(RateLimiter(requests=5, window=60))])
 async def mobile_login(
     req: MobileLoginRequest,
     request: Request,
