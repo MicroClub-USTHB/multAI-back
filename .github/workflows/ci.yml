@@ -77,6 +77,19 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
+      nats:
+        image: nats:2.10-alpine
+        command: --user dummy --pass dummy
+        ports:
+          - 4222:4222
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: dummy
+          MINIO_ROOT_PASSWORD: dummy
+        command: server /data
+        ports:
+          - 9000:9000
 
     steps:
       - uses: actions/checkout@v6
