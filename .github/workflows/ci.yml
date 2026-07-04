@@ -34,6 +34,26 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
+    env:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test_db
+      POSTGRES_PORT: 5432
+      POSTGRES_HOST: localhost
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      NATS_PORT: 4222
+      NATS_HOST: localhost
+      NATS_PASSWORD: dummy
+      NATS_USER: dummy
+      MINIO_API_PORT: 9000
+      MINIO_ROOT_USER: dummy
+      MINIO_ROOT_PASSWORD: dummy
+      MINIO_HOST: localhost
+      jwt_secret: test_secret
+      encryption_key: test_encryption_key
+      FACE_ENCRYPTION_KEY: test_face_encryption_key
+      FIREBASE_CREDENTIALS_PATH: dummy.json
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -69,20 +89,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --all-extras --dev
       - name: Run Migrations
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test_db
-          POSTGRES_PORT: 5432
-          POSTGRES_HOST: localhost
         run: uv run alembic upgrade head
       - name: Run Tests
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test_db
-          POSTGRES_PORT: 5432
-          POSTGRES_HOST: localhost
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
         run: uv run pytest tests/
