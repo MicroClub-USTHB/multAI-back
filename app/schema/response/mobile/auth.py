@@ -18,6 +18,8 @@ class SessionSchema(BaseModel):
 class UserSchema(BaseModel):
     id: uuid.UUID
     email: str
+    name: str | None
+    avatar_url: str | None
 
 class MeResponse(BaseModel):
     user: UserSchema
