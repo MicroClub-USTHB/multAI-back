@@ -31,7 +31,7 @@ import json
 from db.generated import user as user_queries
 from db.generated import devices as device_queries
 from db.generated import session as session_queries
-from db.generated.models import User, UserDevice, UserSession
+from db.generated.models import User, UserDevice
 from app.core.logger import logger
 from app.service.face_embedding import FaceImagePayload, FaceEmbeddingService
 from app.schema.internal.single_face_match import ClosestUserMatch
@@ -124,10 +124,18 @@ class AuthService:
         if not verify_password(req.password, existing_user.hashed_password or ""):
             logger.warning("login attempt: invalid_credentials user_id=%s", existing_user.id)
             raise AppException.unauthorized("Invalid credentials")
-        logger.info("login success user_id=%s", existing_user.id)
+
+        locked_user = await self.user_querier.get_user_by_id_for_update(id=existing_user.id)
+        if not locked_user:
+            raise AppException.unauthorized("User not found")
+        if locked_user.blocked:
+            logger.warning("login attempt: user_blocked_at_commit user_id=%s", locked_user.id)
+            raise AppException.forbidden("User is blocked")
+
+        logger.info("login success user_id=%s", locked_user.id)
         return await self._create_mobile_session(
             redis=redis,
-            user=existing_user,
+            user=locked_user,
             req=req,
             is_new_user=False,
         )
@@ -276,26 +284,9 @@ class AuthService:
     ) -> MobileAuthResponse:
         user_id: uuid.UUID = user.id
 
+        await self.session_querier.lock_user_sessions(user_id=str(user_id))
+
         device = await self._ensure_device_for_login(user_id, req)
-
-        existing_session = await self.session_querier.get_session_by_device_for_user(
-            device_id=device.id,
-            user_id=user_id,
-        )
-
-        if existing_session is None:
-            sessions: list[UserSession] = []
-            async for s in self.session_querier.list_sessions_by_user(user_id=user_id):
-                sessions.append(s)
-
-            if len(sessions) >= AuthService.SESSION_LIMIT:
-                oldest = min(sessions, key=lambda s: (s.last_active, s.created_at))
-                await SessionService.delete_session_cache(redis, oldest.id)
-                await self.session_querier.delete_session_by_id(id=oldest.id, user_id=user_id)
-                logger.warning(
-                    "session_evicted user_id=%s evicted_session_id=%s",
-                    user_id, oldest.id,
-                )
 
         expires_at = datetime.now(timezone.utc) + timedelta(
             days=settings.MOBILE_SESSION_DAYS
@@ -306,9 +297,17 @@ class AuthService:
             device_id=device.id,
             expires_at=expires_at,
         )
-
         if not session:
             raise AppException.internal_error("Failed to create session")
+
+        async for evicted_id in self.session_querier.evict_overflow_sessions(
+            user_id=user_id, id=session.id, session_limit=AuthService.SESSION_LIMIT
+        ):
+            await SessionService.delete_session_cache(redis, evicted_id)
+            logger.warning(
+                "session_evicted user_id=%s evicted_session_id=%s",
+                user_id, evicted_id,
+            )
 
         access_token = create_acces_mobile_token(str(session.id))
         refresh_token = create_refresh_mobile_token(str(session.id))
@@ -323,7 +322,7 @@ class AuthService:
             expires_at=session.expires_at,
             blocked=user.blocked,
             ttl=AuthService.REDIS_SESSION_TTL,
-            last_active=session.last_active
+            last_active=session.last_active,
         )
 
         return MobileAuthResponse(
@@ -334,7 +333,6 @@ class AuthService:
             user_id=user_id,
             is_new_user=is_new_user,
         )
-
     async def refresh_token(
         self,
         redis: RedisClient,

@@ -105,6 +105,7 @@ def user_querier() -> AsyncMock:
     from db.generated import user as user_queries
     q = MagicMock(spec=user_queries.AsyncQuerier)
     q.get_user_by_email = AsyncMock(return_value=None)
+    q.get_user_by_id_for_update = AsyncMock(return_value=None)
     q.create_user = AsyncMock()
     q.get_user_by_id = AsyncMock()
     q.find_closest_user_by_embedding = AsyncMock(return_value=None)
@@ -128,7 +129,13 @@ def device_querier() -> AsyncMock:
 def session_querier() -> AsyncMock:
     from db.generated import session as session_queries
     q = MagicMock(spec=session_queries.AsyncQuerier)
-    q.count_user_sessions = AsyncMock(return_value=0)
+    q.lock_user_sessions = AsyncMock(return_value=None)
+
+    async def _default_empty_evict(*, user_id, id, session_limit):
+        return
+        yield  # pragma: no cover
+
+    q.evict_overflow_sessions = MagicMock(side_effect=_default_empty_evict)
     q.get_session_by_device_for_user = AsyncMock(return_value=None)
     q.list_sessions_by_user = MagicMock(return_value=_empty_async_iter())
     q.delete_session_by_id = AsyncMock()
@@ -240,6 +247,7 @@ class TestLoginExistingUser:
     ) -> None:
         existing = _make_user(password="Correctpass1!")
         user_querier.get_user_by_email.return_value = existing
+        user_querier.get_user_by_id_for_update.return_value = existing
 
         result = await auth_service.mobile_login(
             redis, _make_login_request(password="Correctpass1!")
@@ -257,6 +265,7 @@ class TestLoginExistingUser:
     ) -> None:
         existing = _make_user(password="Rightpassword1!")
         user_querier.get_user_by_email.return_value = existing
+        user_querier.get_user_by_id_for_update.return_value = existing
 
         with pytest.raises(HTTPException) as exc_info:
             await auth_service.mobile_login(
@@ -287,38 +296,24 @@ class TestLoginExistingUser:
 class TestSessionLimit:
     @pytest.mark.asyncio
     async def test_at_cap_evicts_oldest_and_succeeds(
-        self,
-        auth_service: AuthService,
-        user_querier: AsyncMock,
-        session_querier: AsyncMock,
-        redis: AsyncMock,
+        self, auth_service, user_querier, session_querier, redis,
     ) -> None:
         user = _make_user()
         user_querier.get_user_by_email.return_value = user
+        user_querier.get_user_by_id_for_update.return_value = user
 
-        oldest = _make_session(user_id=user.id)
-        middle = _make_session(user_id=user.id)
-        newest = _make_session(user_id=user.id)
+        evicted_id = uuid.uuid4()
 
-        # Stagger so oldest is clearly the minimum
-        base = datetime.now(timezone.utc)
-        oldest.last_active = base - timedelta(seconds=2)
-        middle.last_active = base - timedelta(seconds=1)
-        newest.last_active = base
+        async def _evict(*, user_id, id, session_limit):
+            assert session_limit == AuthService.SESSION_LIMIT
+            yield evicted_id
 
-        async def _sessions(*, user_id):
-            yield oldest
-            yield middle
-            yield newest
-
-        session_querier.list_sessions_by_user = _sessions
+        session_querier.evict_overflow_sessions = MagicMock(side_effect=_evict)
 
         result = await auth_service.mobile_login(redis, _make_login_request())
 
         assert result.access_token
-        session_querier.delete_session_by_id.assert_called_once()
-        called_id = session_querier.delete_session_by_id.call_args.kwargs.get("id")
-        assert called_id == oldest.id
+        session_querier.evict_overflow_sessions.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_within_session_limit_succeeds(
@@ -330,11 +325,48 @@ class TestSessionLimit:
     ) -> None:
         user = _make_user()
         user_querier.get_user_by_email.return_value = user
+        user_querier.get_user_by_id_for_update.return_value = user
         session_querier.list_sessions_by_user = MagicMock(return_value=_empty_async_iter())
 
         result = await auth_service.mobile_login(redis, _make_login_request())
         assert result.access_token
         session_querier.delete_session_by_id.assert_not_called()
+
+
+    @pytest.mark.asyncio
+    async def test_multiple_new_devices_at_cap_evict_exact_overflow(
+        self,
+        auth_service: AuthService,
+        user_querier: AsyncMock,
+        session_querier: AsyncMock,
+        redis: AsyncMock,
+    ) -> None:
+        """evict_overflow_sessions must be called with session_limit=SESSION_LIMIT,
+        and every session id it yields must trigger a Redis cache eviction."""
+        user = _make_user()
+        user_querier.get_user_by_email.return_value = user
+        user_querier.get_user_by_id_for_update.return_value = user
+
+        evicted_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
+
+        async def _evict(*, user_id, id, session_limit):
+            assert session_limit == AuthService.SESSION_LIMIT
+            for eid in evicted_ids:
+                yield eid
+
+        session_querier.evict_overflow_sessions = MagicMock(side_effect=_evict)
+
+        result = await auth_service.mobile_login(redis, _make_login_request())
+
+        assert result.access_token
+        session_querier.evict_overflow_sessions.assert_called_once()
+        call_kwargs = session_querier.evict_overflow_sessions.call_args.kwargs
+        assert call_kwargs["session_limit"] == AuthService.SESSION_LIMIT
+        assert call_kwargs["user_id"] == user.id
+        # Redis delete must be called for each evicted session
+        assert redis.delete.call_count == 3
+
+
 
 
 # ===========================================================================
@@ -483,3 +515,64 @@ class TestFindClosestUser:
         assert result is not None
         assert result.user_id == row.id
         assert result.distance == 0.25
+
+class TestBlockedUserRaceCondition:
+    @pytest.mark.asyncio
+    async def test_blocked_between_initial_check_and_lock_is_caught(
+        self,
+        auth_service: AuthService,
+        user_querier: AsyncMock,
+        session_querier: AsyncMock,
+        redis: AsyncMock,
+    ) -> None:
+        """Simulates the exact race: the first read sees an unblocked user,
+        but the row-locked re-read (as if block_user committed in between)
+        sees blocked=True. Login must still be rejected, and no session
+        may be created."""
+        unblocked_snapshot = _make_user(blocked=False)
+        blocked_after_lock = _make_user(
+            user_id=unblocked_snapshot.id, blocked=True
+        )
+        user_querier.get_user_by_email.return_value = unblocked_snapshot
+        user_querier.get_user_by_id_for_update.return_value = blocked_after_lock
+
+        with pytest.raises(HTTPException) as exc_info:
+            await auth_service.mobile_login(redis, _make_login_request())
+
+        assert exc_info.value.status_code == 403
+        session_querier.upsert_session.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_locked_row_read_is_used_for_session_creation(
+        self,
+        auth_service: AuthService,
+        user_querier: AsyncMock,
+        session_querier: AsyncMock,
+        redis: AsyncMock,
+    ) -> None:
+        """The locked re-read's user object must be what actually gets
+        passed forward — not the earlier, possibly-stale read."""
+        stale = _make_user(email="stale@test.com")
+        fresh = _make_user(user_id=stale.id, email="fresh@test.com")
+        user_querier.get_user_by_email.return_value = stale
+        user_querier.get_user_by_id_for_update.return_value = fresh
+
+        await auth_service.mobile_login(redis, _make_login_request())
+
+        user_querier.get_user_by_id_for_update.assert_called_once_with(id=stale.id)
+
+    @pytest.mark.asyncio
+    async def test_missing_user_at_lock_time_raises_401(
+        self,
+        auth_service: AuthService,
+        user_querier: AsyncMock,
+        redis: AsyncMock,
+    ) -> None:
+        """Defensive case: user vanished between the two reads (e.g. deleted)."""
+        user_querier.get_user_by_email.return_value = _make_user()
+        user_querier.get_user_by_id_for_update.return_value = None
+
+        with pytest.raises(HTTPException) as exc_info:
+            await auth_service.mobile_login(redis, _make_login_request())
+
+        assert exc_info.value.status_code == 401

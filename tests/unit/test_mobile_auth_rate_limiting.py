@@ -35,11 +35,15 @@ class FakeUser:
         self.hashed_password = hash_password("ValidPass@123")
         self.blocked = False
 
-
 class FakeUserQuerier:
-    async def get_user_by_email(self, email: str) -> FakeUser:
-        return FakeUser()
+    def __init__(self) -> None:
+        self._user = FakeUser()
 
+    async def get_user_by_email(self, email: str) -> FakeUser:
+        return self._user
+
+    async def get_user_by_id_for_update(self, id: uuid.UUID) -> FakeUser:
+        return self._user
 
 class FakeDeviceQuerier:
     pass
