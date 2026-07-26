@@ -51,7 +51,7 @@ jobs:
       MINIO_ROOT_PASSWORD: dummy
       MINIO_HOST: localhost
       jwt_secret: test_secret
-      encryption_key: test_encryption_key
+      encryption_key: MPCSXH0IYfkp8JTpUNH0vUVyDlUeP6OKI8kz5iK54mw=
       FACE_ENCRYPTION_KEY: test_face_encryption_key
       FIREBASE_CREDENTIALS_PATH: dummy.json
     services:
