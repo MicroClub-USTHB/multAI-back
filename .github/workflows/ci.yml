@@ -83,7 +83,7 @@ jobs:
         ports:
           - 4222:4222
       minio:
-        image: minio/minio:latest
+        image: quay.io/minio/minio:latest
         env:
           MINIO_ROOT_USER: dummy
           MINIO_ROOT_PASSWORD: dummy
