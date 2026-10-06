@@ -47,8 +47,8 @@ jobs:
       NATS_PASSWORD: dummy
       NATS_USER: dummy
       MINIO_API_PORT: 9000
-      MINIO_ROOT_USER: dummy
-      MINIO_ROOT_PASSWORD: dummy
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
       MINIO_HOST: localhost
       jwt_secret: test_secret
       encryption_key: MPCSXH0IYfkp8JTpUNH0vUVyDlUeP6OKI8kz5iK54mw=
@@ -83,10 +83,11 @@ jobs:
         ports:
           - 4222:4222
       minio:
-        image: bitnami/minio:latest
+        image: cgr.dev/chainguard/minio:latest
+        command: server /tmp/data
         env:
-          MINIO_ROOT_USER: dummy
-          MINIO_ROOT_PASSWORD: dummy
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
         ports:
           - 9000:9000
 
