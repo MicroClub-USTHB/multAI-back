@@ -27,7 +27,6 @@ from app.schema.request.mobile.auth import (
     MobileLoginRequest,
     MobileRegisterRequest,
     RegisterVerifyRequest,
-    MobileAuthBaseRequest,
 )
 from app.schema.response.mobile.auth import MobileAuthResponse, RegisterPendingResponse
 from sqlalchemy.exc import SQLAlchemyError
