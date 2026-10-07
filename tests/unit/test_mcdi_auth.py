@@ -80,13 +80,17 @@ async def test_validate_token_cached_hit(mcdi_service: McdiService) -> None:
     redis.get.return_value = json.dumps(cached_payload)
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        data = await mcdi_service.validate_token_cached(redis, "token_xyz", ttl_seconds=60)
+        data = await mcdi_service.validate_token_cached(
+            redis, "token_xyz", ttl_seconds=60
+        )
         assert data == cached_payload
         mock_post.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_validate_token_cached_miss_populates_cache(mcdi_service: McdiService) -> None:
+async def test_validate_token_cached_miss_populates_cache(
+    mcdi_service: McdiService,
+) -> None:
     redis = AsyncMock()
     redis.get.return_value = None
 
@@ -100,7 +104,9 @@ async def test_validate_token_cached_miss_populates_cache(mcdi_service: McdiServ
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_resp
-        data = await mcdi_service.validate_token_cached(redis, "token_xyz", ttl_seconds=60)
+        data = await mcdi_service.validate_token_cached(
+            redis, "token_xyz", ttl_seconds=60
+        )
 
         assert data == remote_payload
         mock_post.assert_called_once()
@@ -110,7 +116,9 @@ async def test_validate_token_cached_miss_populates_cache(mcdi_service: McdiServ
 
 
 @pytest.mark.asyncio
-async def test_logout_invalidates_cache_and_calls_mcdi(mcdi_service: McdiService) -> None:
+async def test_logout_invalidates_cache_and_calls_mcdi(
+    mcdi_service: McdiService,
+) -> None:
     redis = AsyncMock()
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -335,3 +343,36 @@ async def test_token_auth_validate_mcdi_session_revoked() -> None:
     assert exc_info.value.status_code == 401
     assert "MCDI session invalid" in exc_info.value.detail
 
+
+@pytest.mark.asyncio
+async def test_web_mcdi_callback_redirects_to_admin() -> None:
+    from starlette.requests import Request
+    from app.router.web.auth import mcdi_callback
+
+    mock_request = MagicMock(spec=Request)
+    mock_request.cookies = {"mcdi_state": "state_abc"}
+
+    container = MagicMock()
+    container.mcdi_service = AsyncMock()
+    container.mcdi_service.exchange_code.return_value = {
+        "token": "admin_sess_tok",
+        "member": {"email": "admin@microclub.info", "id": "111"},
+    }
+
+    mock_staff = MagicMock()
+    mock_staff.email = "admin@microclub.info"
+    container.staff_user_querier = AsyncMock()
+    container.staff_user_querier.get_staff_user_by_email.return_value = mock_staff
+
+    response = await mcdi_callback(
+        request=mock_request,
+        code="auth_code_123",
+        state="state_abc",
+        container=container,
+    )
+
+    container.mcdi_service.exchange_code.assert_called_once_with(
+        code="auth_code_123",
+        redirect_uri=settings.MCDI_REDIRECT_URI_WEB,
+    )
+    assert response.headers["location"].endswith("/admin")

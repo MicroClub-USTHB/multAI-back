@@ -50,7 +50,9 @@ async def _touch_session_activity(
     cached: MobileSessionCache,
     now: datetime,
 ) -> None:
-    if (now - cached.last_active).total_seconds() <= settings.SESSION_ACTIVITY_THROTTLE_SECONDS:
+    if (
+        now - cached.last_active
+    ).total_seconds() <= settings.SESSION_ACTIVITY_THROTTLE_SECONDS:
         return
 
     new_idle_expires_at = min(
@@ -105,7 +107,9 @@ async def get_current_mobile_user(
             cached.blocked,
         )
         await _validate_mcdi_session(container, redis, cached.mcdi_token)
-        await _touch_session_activity(container, redis, cached, datetime.now(timezone.utc))
+        await _touch_session_activity(
+            container, redis, cached, datetime.now(timezone.utc)
+        )
 
         return MobileUserSchema(
             user_id=cached.user_id,

@@ -69,6 +69,8 @@ class McdiExchangeRequest(BaseModel):
         if info.field_name == "device_type":
             return stripped.lower()
         return stripped
+
+
 class MobileRegisterRequest(MobileAuthBaseRequest):
     @field_validator("password")
     @classmethod
@@ -106,6 +108,8 @@ class ResendOtpRequest(BaseModel):
         if not isinstance(value, str):
             return value
         return value.strip().lower()
+
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 

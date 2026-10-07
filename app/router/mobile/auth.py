@@ -147,6 +147,7 @@ async def mcdi_exchange(
         )
     return result
 
+
 @router.post(
     "/refresh",
     response_model=MobileAuthResponse,

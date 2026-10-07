@@ -23,12 +23,14 @@ class McdiService:
 
     def get_sso_authorize_url(self, redirect_uri: str, state: str) -> str:
         """Constructs the MCDI SSO authorization URL matching MCDI's AuthorizeQueryDto."""
-        params = urllib.parse.urlencode({
-            "client_id": self.client_id,
-            "redirect_uri": redirect_uri,
-            "server_id": self.server_id,
-            "state": state,
-        })
+        params = urllib.parse.urlencode(
+            {
+                "client_id": self.client_id,
+                "redirect_uri": redirect_uri,
+                "server_id": self.server_id,
+                "state": state,
+            }
+        )
         # MCDI_BASE_URL ends with /api (e.g. https://mcdi.microclub.info/api)
         # The authorize route is /api/auth/sso/authorize
         return f"{self.base_url}/auth/sso/authorize?{params}"
@@ -66,8 +68,14 @@ class McdiService:
             try:
                 response = await client.post(url, json=payload, headers=headers)
                 if response.status_code != 200:
-                    detail = self._parse_error_detail(response, "Failed to exchange MCDI code")
-                    logger.warning("mcdi_exchange_failed status=%d detail=%s", response.status_code, detail)
+                    detail = self._parse_error_detail(
+                        response, "Failed to exchange MCDI code"
+                    )
+                    logger.warning(
+                        "mcdi_exchange_failed status=%d detail=%s",
+                        response.status_code,
+                        detail,
+                    )
                     raise AppException.unauthorized(f"MCDI Error: {detail}")
                 return response.json()
             except httpx.RequestError as e:
@@ -87,8 +95,14 @@ class McdiService:
             try:
                 response = await client.post(url, json=payload, headers=headers)
                 if response.status_code != 200:
-                    detail = self._parse_error_detail(response, "Invalid or expired MCDI session")
-                    logger.warning("mcdi_validation_failed status=%d detail=%s", response.status_code, detail)
+                    detail = self._parse_error_detail(
+                        response, "Invalid or expired MCDI session"
+                    )
+                    logger.warning(
+                        "mcdi_validation_failed status=%d detail=%s",
+                        response.status_code,
+                        detail,
+                    )
                     raise AppException.unauthorized(f"MCDI validation failed: {detail}")
                 return response.json()
             except httpx.RequestError as e:

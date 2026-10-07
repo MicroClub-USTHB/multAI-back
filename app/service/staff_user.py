@@ -100,8 +100,6 @@ class StaffUserService:
             logger.error("Failed to list staff users: %s", exc)
             raise DBException.handle(exc)
 
-
-
     async def get_staff_user(self, stuff_id: uuid.UUID) -> StaffUser:
         stuff: StaffUser | None = await self.staff_user_querier.get_staff_user_by_id(
             id=stuff_id

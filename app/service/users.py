@@ -330,9 +330,13 @@ class AuthService:
         window = settings.RATE_LIMIT_LOGIN_WINDOW_SECONDS
 
         if client_ip:
-            await self.check_rate_limit(redis, f"rate:ip:{client_ip}", max_attempts, window)
+            await self.check_rate_limit(
+                redis, f"rate:ip:{client_ip}", max_attempts, window
+            )
 
-        mcdi_data = await self.mcdi_service.exchange_code(req.code, settings.MCDI_REDIRECT_URI_MOBILE)
+        mcdi_data = await self.mcdi_service.exchange_code(
+            req.code, settings.MCDI_REDIRECT_URI_MOBILE
+        )
 
         member = mcdi_data.get("member", {})
         email = member.get("email")
