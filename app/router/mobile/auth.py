@@ -13,6 +13,7 @@ from app.deps.token_auth import MobileUserSchema, get_current_mobile_user
 from app.deps.rate_limit import RateLimiter
 
 from app.schema.request.mobile.auth import (
+    McdiExchangeRequest,
     MobileLoginRequest,
     MobileRegisterRequest,
     RegisterVerifyRequest,
@@ -117,6 +118,34 @@ async def mobile_login(
     )
     return result
 
+
+@router.post(
+    "/mcdi/exchange",
+    response_model=MobileAuthResponse,
+    dependencies=[Depends(RateLimiter(requests=5, window=60))],
+)
+async def mcdi_exchange(
+    req: McdiExchangeRequest,
+    request: Request,
+    container: Container = Depends(get_container),
+) -> MobileAuthResponse:
+    client_ip = get_client_ip(request)
+    result = await container.auth_service.mcdi_exchange(
+        container.redis, req, client_ip=client_ip
+    )
+    if result.is_new_user:
+        await container.audit_service.create_record(
+            event_type=AuditEventType.USER_SIGNUP,
+            user_id=result.user_id,
+            metadata={"endpoint": "mcdi_exchange"},
+        )
+    else:
+        await container.audit_service.create_record(
+            event_type=AuditEventType.USER_LOGIN,
+            user_id=result.user_id,
+            metadata={"endpoint": "mcdi_exchange"},
+        )
+    return result
 
 @router.post(
     "/refresh",

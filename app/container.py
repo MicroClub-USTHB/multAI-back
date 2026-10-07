@@ -18,6 +18,7 @@ from app.service.user_photo import UserPhotoService
 from app.service.upload_requests import UploadRequestsService
 from app.service.users import AuthService
 from app.service.user_notification import UserNotificationService
+from app.service.mcdi import McdiService
 from db.generated import devices as device_queries
 from db.generated import photo_approvals as photo_approval_queries
 from db.generated import processing_jobs as processing_job_queries
@@ -86,6 +87,8 @@ class Container:
             redis=self.redis,
         )
 
+        self.mcdi_service = McdiService()
+
         self.device_service = DeviceService()
         self.device_service.init(
             device_querier=self.device_querier,
@@ -97,6 +100,7 @@ class Container:
             session_querier=self.session_querier,
             refresh_token_querier=self.refresh_token_querier,
             face_embedding_service=self.face_embedding_service,
+            mcdi_service=self.mcdi_service,
         )
 
         self.staff_drive_service = StaffDriveService(

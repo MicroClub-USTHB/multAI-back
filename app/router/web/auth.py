@@ -1,42 +1,81 @@
-from fastapi import APIRouter, Depends
-from app.container import Container, get_container
-from fastapi import Response
+import secrets
 
+from fastapi import APIRouter, Cookie, Depends, Request, Response
+from fastapi.responses import RedirectResponse
+
+from app.container import Container, get_container
 from app.core.config import settings
+from app.core.exceptions import AppException
 from app.deps.cookie_auth import get_current_staff_user
-from app.deps.rate_limit import RateLimiter
-from app.schema.request.web.auth import WebAuthRequest
-from app.schema.response.web.auth import WebAuthResponse
 from app.schema.response.web.staff_user import StaffUserSchema
 from db.generated.models import StaffUser
 
 router = APIRouter(prefix="/auth")
 
 
-@router.post(
-    "/login",
-    response_model=WebAuthResponse,
-    description="so here both the dahbsoard will authneticate from this endpoitn ",
-    dependencies=[Depends(RateLimiter(requests=5, window=60))],
-)
-async def admin_login(
-    req: WebAuthRequest,
-    r: Response,
+@router.get("/mcdi/login")
+async def mcdi_login(
     container: Container = Depends(get_container),
-) -> WebAuthResponse:
-
-    authResponse = await container.staff_user_service.admin_login(
-        email=req.email, password=req.password
+) -> RedirectResponse:
+    state = secrets.token_urlsafe(16)
+    url = container.mcdi_service.get_sso_authorize_url(
+        redirect_uri=settings.MCDI_REDIRECT_URI_WEB,
+        state=state,
     )
-    r.set_cookie(
+    response = RedirectResponse(url=url)
+    response.set_cookie(
+        key="mcdi_state",
+        value=state,
+        httponly=True,
+        max_age=300,
+        secure=settings.environment != "dev",
+        samesite="lax",
+    )
+    return response
+
+
+@router.get("/mcdi/callback")
+async def mcdi_callback(
+    request: Request,
+    code: str,
+    state: str,
+    container: Container = Depends(get_container),
+) -> RedirectResponse:
+    cookie_state = request.cookies.get("mcdi_state")
+    if not cookie_state or state != cookie_state:
+        raise AppException.unauthorized("Invalid state parameter")
+
+    mcdi_data = await container.mcdi_service.exchange_code(
+        code=code,
+        redirect_uri=settings.MCDI_REDIRECT_URI_WEB,
+    )
+
+    # Extract email and verify staff access
+    email = mcdi_data.get("member", {}).get("email")
+    if not email:
+        raise AppException.unauthorized("No email provided by MCDI")
+
+    staff_user = await container.staff_user_querier.get_staff_user_by_email(email=email)
+    if not staff_user:
+        raise AppException.unauthorized("Not authorized for admin panel")
+
+    token = mcdi_data.get("token")
+    if not token:
+        raise AppException.internal_error("MCDI did not return a session token")
+
+    frontend_url = settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "http://localhost:5173"
+
+    redirect_res = RedirectResponse(url=f"{frontend_url}/dashboard")
+    redirect_res.set_cookie(
         key="access_token",
-        value=authResponse.access_token,
+        value=token,
         httponly=True,
         secure=settings.environment != "dev",
-        samesite="strict",
+        samesite="lax",
         max_age=60 * 60 * 24 * 7,
     )
-    return authResponse
+    redirect_res.delete_cookie("mcdi_state")
+    return redirect_res
 
 
 @router.get("/me", response_model=StaffUserSchema)
@@ -55,11 +94,15 @@ async def get_me_admin(
 @router.post("/logout", status_code=204)
 async def admin_logout(
     r: Response,
-    _: StaffUser = Depends(get_current_staff_user),
+    token: str | None = Cookie(default=None, alias="access_token"),
+    container: Container = Depends(get_container),
 ) -> None:
+    if token:
+        await container.mcdi_service.logout(token, redis=container.redis)
+
     r.delete_cookie(
         key="access_token",
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=settings.environment != "dev",
+        samesite="lax",
     )

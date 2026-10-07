@@ -5,8 +5,7 @@ from typing import Literal, Optional
 import uuid
 
 from app.core.exceptions import AppException, DBException, DBExceptionImpl
-from app.core.securite import create_access_staff_token, hash_password, verify_password
-from app.schema.response.web.auth import WebAuthResponse
+from app.core.securite import hash_password
 from db.generated import staff_user as staff_queries
 from db.generated.staff_user import ListStaffUsersParams
 from db.generated.models import StaffUser, StaffRole
@@ -101,28 +100,7 @@ class StaffUserService:
             logger.error("Failed to list staff users: %s", exc)
             raise DBException.handle(exc)
 
-    async def admin_login(
-        self,
-        email: str,
-        password: str,
-    ) -> WebAuthResponse:
-        normalized_email = email.strip().lower()
-        staff: StaffUser | None = await self.staff_user_querier.get_staff_user_by_email(
-            email=normalized_email
-        )
-        if staff is None or not verify_password(password, staff.password):
-            logger.info("admin login failed for email %s", normalized_email)
-            raise AppException.unauthorized("Invalid email or password")
 
-        access_token = create_access_staff_token(
-            staff_id=str(staff.id), role=staff.role
-        )
-
-        return WebAuthResponse(
-            access_token=access_token,
-            user_id=staff.id,
-            role=staff.role,
-        )
 
     async def get_staff_user(self, stuff_id: uuid.UUID) -> StaffUser:
         stuff: StaffUser | None = await self.staff_user_querier.get_staff_user_by_id(

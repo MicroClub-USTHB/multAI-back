@@ -1,6 +1,6 @@
 -- name: CreateUser :one
-INSERT INTO users (email, hashed_password)
-VALUES ($1, $2)
+INSERT INTO users (email, hashed_password, discord_id)
+VALUES ($1, $2, $3)
 RETURNING *;
 
 -- name: GetUserById :one
@@ -18,6 +18,18 @@ FOR UPDATE;
 SELECT *
 FROM users
 WHERE email = $1;
+
+-- name: GetUserByDiscordId :one
+SELECT *
+FROM users
+WHERE discord_id = $1;
+
+-- name: UpdateUserDiscordId :one
+UPDATE users
+SET discord_id = $1,
+    updated_at = NOW()
+WHERE id = $2
+RETURNING *;
 
 -- name: UpdateUserPassword :one
 UPDATE users
