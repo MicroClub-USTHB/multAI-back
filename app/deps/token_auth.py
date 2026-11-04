@@ -27,32 +27,13 @@ def _check_session_validity(
         raise HTTPException(status_code=403, detail="User is blocked")
 
 
-async def _validate_mcdi_session(
-    container: Container,
-    redis: RedisClient,
-    mcdi_token: str | None,
-) -> None:
-    if not mcdi_token:
-        return
-    try:
-        await container.mcdi_service.validate_token_cached(
-            redis=redis,
-            token=mcdi_token,
-            ttl_seconds=300,
-        )
-    except Exception:
-        raise HTTPException(status_code=401, detail="MCDI session invalid or expired")
-
-
 async def _touch_session_activity(
     container: Container,
     redis: RedisClient,
     cached: MobileSessionCache,
     now: datetime,
 ) -> None:
-    if (
-        now - cached.last_active
-    ).total_seconds() <= settings.SESSION_ACTIVITY_THROTTLE_SECONDS:
+    if (now - cached.last_active).total_seconds() <= settings.SESSION_ACTIVITY_THROTTLE_SECONDS:
         return
 
     new_idle_expires_at = min(
@@ -73,7 +54,6 @@ async def _touch_session_activity(
         blocked=cached.blocked,
         ttl=settings.MOBILE_SESSION_TTL_SECONDS,
         last_active=now,
-        mcdi_token=cached.mcdi_token,
     )
 
 
@@ -106,10 +86,7 @@ async def get_current_mobile_user(
             cached.absolute_expires_at,
             cached.blocked,
         )
-        await _validate_mcdi_session(container, redis, cached.mcdi_token)
-        await _touch_session_activity(
-            container, redis, cached, datetime.now(timezone.utc)
-        )
+        await _touch_session_activity(container, redis, cached, datetime.now(timezone.utc))
 
         return MobileUserSchema(
             user_id=cached.user_id,
@@ -144,7 +121,6 @@ async def get_current_mobile_user(
         blocked=user.blocked,
         ttl=settings.MOBILE_SESSION_TTL_SECONDS,
         last_active=session.last_active,
-        mcdi_token=None,
     )
 
     return MobileUserSchema(

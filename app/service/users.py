@@ -21,9 +21,7 @@ from app.core.config import settings
 from app.infra.redis import RedisClient
 from app.infra.nats import NatsClient
 from app.infra.minio import Bucket, IMAGES_BUCKET_NAME
-from app.service.mcdi import McdiService
 from app.schema.request.mobile.auth import (
-    McdiExchangeRequest,
     MobileLoginRequest,
     MobileRegisterRequest,
     RegisterVerifyRequest,
@@ -57,14 +55,12 @@ class AuthService:
         session_querier: session_queries.AsyncQuerier,
         refresh_token_querier: refresh_token_queries.AsyncQuerier,
         face_embedding_service: FaceEmbeddingService,
-        mcdi_service: McdiService | None = None,
     ):
         self.user_querier = user_querier
         self.device_querier = device_querier
         self.session_querier = session_querier
         self.refresh_token_querier = refresh_token_querier
         self.face_embedding_service = face_embedding_service
-        self.mcdi_service = mcdi_service or McdiService()
 
     async def _ensure_device_for_login(
         self,
@@ -319,70 +315,6 @@ class AuthService:
             is_new_user=True,
         )
 
-    async def mcdi_exchange(
-        self,
-        redis: RedisClient,
-        req: McdiExchangeRequest,
-        client_ip: Optional[str] = None,
-    ) -> MobileAuthResponse:
-        logger.info("mcdi_exchange attempt")
-        max_attempts = settings.RATE_LIMIT_LOGIN_MAX_ATTEMPTS
-        window = settings.RATE_LIMIT_LOGIN_WINDOW_SECONDS
-
-        if client_ip:
-            await self.check_rate_limit(
-                redis, f"rate:ip:{client_ip}", max_attempts, window
-            )
-
-        mcdi_data = await self.mcdi_service.exchange_code(
-            req.code, settings.MCDI_REDIRECT_URI_MOBILE
-        )
-
-        member = mcdi_data.get("member", {})
-        email = member.get("email")
-        discord_id = member.get("id") or member.get("discordId")
-        mcdi_token = mcdi_data.get("token")
-
-        if not email or not discord_id or not mcdi_token:
-            raise AppException.unauthorized("Invalid MCDI payload")
-
-        await self.check_rate_limit(redis, f"rate:email:{email}", max_attempts, window)
-
-        user = await self.user_querier.get_user_by_discord_id(discord_id=discord_id)
-        is_new_user = False
-
-        if not user:
-            user = await self.user_querier.get_user_by_email(email=email)
-            if user:
-                user = await self.user_querier.update_user_discord_id(
-                    discord_id=discord_id,
-                    id=user.id,
-                )
-                if not user:
-                    raise AppException.internal_error("Failed to link Discord account")
-            else:
-                user = await self.user_querier.create_user(
-                    email=email, hashed_password=None, discord_id=discord_id
-                )
-                if not user:
-                    raise AppException.internal_error("Failed to create user")
-                is_new_user = True
-
-        if user.blocked:
-            raise AppException.forbidden("User is blocked")
-
-        locked_user = await self.user_querier.get_user_by_id_for_update(id=user.id)
-        if not locked_user or locked_user.blocked:
-            raise AppException.forbidden("User is blocked")
-
-        return await self._create_mobile_session(
-            redis=redis,
-            user=locked_user,
-            req=req,
-            is_new_user=is_new_user,
-            mcdi_token=mcdi_token,
-        )
-
     async def _create_mobile_session(
         self,
         *,
@@ -390,7 +322,6 @@ class AuthService:
         user: User,
         req: Any,
         is_new_user: bool,
-        mcdi_token: str | None = None,
     ) -> MobileAuthResponse:
         user_id: uuid.UUID = user.id
 
@@ -444,7 +375,6 @@ class AuthService:
             blocked=user.blocked,
             ttl=AuthService.REDIS_SESSION_TTL,
             last_active=session.last_active,
-            mcdi_token=mcdi_token,
         )
 
         return MobileAuthResponse(
@@ -577,10 +507,6 @@ class AuthService:
         session_id: str,
     ) -> dict[str, str]:
         sid = uuid.UUID(session_id)
-        cached = await SessionService.get_cached_session(redis, sid)
-        if cached and cached.mcdi_token:
-            await self.mcdi_service.logout(cached.mcdi_token, redis=redis)
-
         await self.session_querier.delete_session_by_id(
             id=sid, user_id=uuid.UUID(user_id)
         )

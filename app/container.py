@@ -100,7 +100,6 @@ class Container:
             session_querier=self.session_querier,
             refresh_token_querier=self.refresh_token_querier,
             face_embedding_service=self.face_embedding_service,
-            mcdi_service=self.mcdi_service,
         )
 
         self.staff_drive_service = StaffDriveService(

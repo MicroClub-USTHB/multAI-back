@@ -128,10 +128,9 @@ class Settings(BaseSettings):
     # MCDI Configuration
     MCDI_PROJECT_ID: str = ""
     MCDI_API_KEY: str = ""
-    MCDI_BASE_URL: str = "https://mcdi.microclub.info/api"
+    MCDI_BASE_URL: str = "https://mcid.microclub.info/api"
     MCDI_SERVER_ID: str = ""
     MCDI_REDIRECT_URI_WEB: str = ""
-    MCDI_REDIRECT_URI_MOBILE: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
