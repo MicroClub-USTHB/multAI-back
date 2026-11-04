@@ -30,8 +30,11 @@ async def get_current_staff_user(
     if not email:
         raise AppException.unauthorized("Invalid MCDI payload: missing email")
 
+    normalized_email = email.strip().lower()
     # 2. Get local StaffUser by email
-    staff_user = await container.staff_user_querier.get_staff_user_by_email(email=email)
+    staff_user = await container.staff_user_querier.get_staff_user_by_email(
+        email=normalized_email
+    )
     if staff_user is None:
         raise AppException.unauthorized("Staff user not found or not authorized")
 

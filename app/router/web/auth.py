@@ -1,6 +1,8 @@
+from typing import Annotated
+import logging
 import secrets
 
-from fastapi import APIRouter, Cookie, Depends, Request, Response
+from fastapi import APIRouter, Cookie, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
 from app.container import Container, get_container
@@ -9,6 +11,8 @@ from app.core.exceptions import AppException
 from app.deps.cookie_auth import get_current_staff_user
 from app.schema.response.web.staff_user import StaffUserSchema
 from db.generated.models import StaffUser
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth")
 
@@ -37,10 +41,25 @@ async def mcdi_login(
 @router.get("/mcdi/callback")
 async def mcdi_callback(
     request: Request,
-    code: str,
-    state: str,
+    code: Annotated[str | None, Query()] = None,
+    state: Annotated[str | None, Query()] = None,
+    error: Annotated[str | None, Query()] = None,
+    error_description: Annotated[str | None, Query()] = None,
     container: Container = Depends(get_container),
 ) -> RedirectResponse:
+    frontend_url = (
+        settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "http://localhost:5173"
+    )
+
+    if error:
+        logger.warning("mcdi_callback error=%s desc=%s", error, error_description)
+        redirect_res = RedirectResponse(url=f"{frontend_url}/auth/login?error={error}")
+        redirect_res.delete_cookie("mcdi_state")
+        return redirect_res
+
+    if not code or not state:
+        raise AppException.bad_request("Missing code or state parameter")
+
     cookie_state = request.cookies.get("mcdi_state")
     if not cookie_state or state != cookie_state:
         raise AppException.unauthorized("Invalid state parameter")
@@ -55,17 +74,16 @@ async def mcdi_callback(
     if not email:
         raise AppException.unauthorized("No email provided by MCDI")
 
-    staff_user = await container.staff_user_querier.get_staff_user_by_email(email=email)
+    normalized_email = email.strip().lower()
+    staff_user = await container.staff_user_querier.get_staff_user_by_email(
+        email=normalized_email
+    )
     if not staff_user:
         raise AppException.unauthorized("Not authorized for admin panel")
 
     token = mcdi_data.get("token")
     if not token:
         raise AppException.internal_error("MCDI did not return a session token")
-
-    frontend_url = (
-        settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "http://localhost:5173"
-    )
 
     redirect_res = RedirectResponse(url=f"{frontend_url}/admin")
     redirect_res.set_cookie(
